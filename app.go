@@ -99,6 +99,9 @@ func (a *App) SetDomain(domain string) {
 func (a *App) UseTLS(tlsCert, tlsKey []byte) {
 	a.tlsCertBytes = tlsCert
 	a.tlsKeyBytes = tlsKey
+
+	// this defaults to inferred or true.
+	a.auth.SetCookieAsSecure(true)
 }
 
 // UseTLSFromEnvironment reads TLS settings from the environment.

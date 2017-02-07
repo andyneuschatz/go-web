@@ -455,8 +455,8 @@ func (rc *RequestContext) WriteCookie(cookie *http.Cookie) {
 	http.SetCookie(rc.Response, cookie)
 }
 
-// SetCookie is a helper method for WriteCookie.
-func (rc *RequestContext) SetCookie(name string, value string, expires *time.Time, path string) {
+// WriteNewCookie is a helper method for WriteCookie.
+func (rc *RequestContext) WriteNewCookie(name string, value string, expires *time.Time, path string, secure bool) {
 	c := http.Cookie{}
 	c.Name = name
 	c.HttpOnly = true
@@ -467,6 +467,7 @@ func (rc *RequestContext) SetCookie(name string, value string, expires *time.Tim
 	}
 	c.Value = value
 	c.Path = path
+	c.Secure = secure
 	if expires != nil {
 		c.Expires = *expires
 	}

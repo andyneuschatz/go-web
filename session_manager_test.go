@@ -67,7 +67,7 @@ func TestSessionManagerVerifySession(t *testing.T) {
 	assert.Equal(1, valid.UserID)
 
 	invalid, err := sm.VerifySession(NewSessionID(), nil)
-	assert.NotNil(err)
+	assert.Nil(err) // we do not return an error on miss if no fetch handler is configured.
 	assert.Nil(invalid)
 }
 
@@ -95,4 +95,14 @@ func TestSessionManagerVerifySessionWithFetch(t *testing.T) {
 	invalid, err := sm.VerifySession(NewSessionID(), nil)
 	assert.Nil(err)
 	assert.Nil(invalid)
+}
+
+func TestSessionManagerIsCookieSecure(t *testing.T) {
+	assert := assert.New(t)
+	sm := NewSessionManager()
+	assert.False(sm.IsCookieSecure())
+	sm.SetCookieAsSecure(true)
+	assert.True(sm.IsCookieSecure())
+	sm.SetCookieAsSecure(false)
+	assert.False(sm.IsCookieSecure())
 }

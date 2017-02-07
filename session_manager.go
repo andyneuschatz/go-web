@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"net/url"
 	"time"
-
-	exception "github.com/blendlabs/go-exception"
 )
 
 const (
@@ -49,6 +47,7 @@ type SessionManager struct {
 	sessionParamName     string
 
 	sessionCookieIsSessionBound  bool
+	sessionCookieIsSecure        *bool
 	sessionCookieTimeoutProvider func(rc *RequestContext) *time.Time
 }
 
@@ -62,6 +61,12 @@ func (sm *SessionManager) SetCookiesAsSessionBound() {
 func (sm *SessionManager) SetCookieTimeout(timeoutProvider func(rc *RequestContext) *time.Time) {
 	sm.sessionCookieIsSessionBound = false
 	sm.sessionCookieTimeoutProvider = timeoutProvider
+}
+
+// SetCookieAsSecure overrides defaults when determining if we should use the HTTPS only cooikie option.
+// The default depends on the app configuration (if tls is configured and enabled).
+func (sm *SessionManager) SetCookieAsSecure(isSecure bool) {
+	sm.sessionCookieIsSecure = &isSecure
 }
 
 // SessionParamName returns the session param name.
@@ -119,14 +124,24 @@ func (sm *SessionManager) Login(userID int64, context *RequestContext) (*Session
 	}
 
 	sm.sessionCache.Add(session)
+	sm.InjectSessionCookie(context, sessionID)
+	return session, nil
+}
+
+// InjectSessionCookie injects a session cookie into the context.
+func (sm *SessionManager) InjectSessionCookie(context *RequestContext, sessionID string) {
 	if context != nil {
 		if sm.sessionCookieIsSessionBound {
-			context.SetCookie(sm.sessionParamName, sessionID, nil, "/")
+			context.WriteNewCookie(sm.sessionParamName, sessionID, nil, "/", sm.IsCookieSecure())
 		} else if sm.sessionCookieTimeoutProvider != nil {
-			context.SetCookie(sm.sessionParamName, sessionID, sm.sessionCookieTimeoutProvider(context), "/")
+			context.WriteNewCookie(sm.sessionParamName, sessionID, sm.sessionCookieTimeoutProvider(context), "/", sm.IsCookieSecure())
 		}
 	}
-	return session, nil
+}
+
+// IsCookieSecure returns if the session cookie is configured to be secure only.
+func (sm *SessionManager) IsCookieSecure() bool {
+	return sm.sessionCookieIsSecure != nil && *sm.sessionCookieIsSecure
 }
 
 // Logout un-authenticates a session.
@@ -157,7 +172,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 	}
 
 	if sm.fetchHandler == nil {
-		return nil, exception.New("Must provide a `fetchHandler` to retrieve dormant sessions.")
+		return nil, nil
 	}
 
 	var session *Session
