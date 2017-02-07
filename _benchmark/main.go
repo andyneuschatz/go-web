@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"time"
 
 	logger "github.com/blendlabs/go-logger"
 	"github.com/blendlabs/go-web"
@@ -42,10 +43,16 @@ func port() string {
 }
 
 func jsonHandler(r *web.RequestContext) web.ControllerResult {
+	time.Sleep(1000 * time.Millisecond)
 	r.Response.Header().Set(HeaderContentType, ContentTypeJSON)
 	r.Response.Header().Set(HeaderServer, ServerName)
 	json.NewEncoder(r.Response).Encode(&message{Message: MessageText})
 	return nil
+}
+
+func jsonResultHandler(r *web.RequestContext) web.ControllerResult {
+	time.Sleep(1000 * time.Millisecond)
+	return r.JSON(&message{Message: MessageText})
 }
 
 func main() {
@@ -53,5 +60,6 @@ func main() {
 	app.SetPort(port())
 	app.SetDiagnostics(logger.NewDiagnosticsAgentFromEnvironment())
 	app.GET("/json", jsonHandler)
+	app.GET("/json_result", jsonResultHandler)
 	log.Fatal(app.Start())
 }
