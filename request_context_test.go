@@ -133,3 +133,13 @@ func TestRequestContextHeaderParam(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal("foo", value)
 }
+
+func TestRequestContextWriteNewCookie(t *testing.T) {
+	assert := assert.New(t)
+
+	context, err := NewMockRequestBuilder(nil).RequestContext(nil)
+	assert.Nil(err)
+
+	context.WriteNewCookie("foo", "bar", nil, "/foo/bar", true)
+	assert.Equal("foo=bar; Path=/foo/bar; HttpOnly; Secure", context.Response.Header().Get("Set-Cookie"))
+}
