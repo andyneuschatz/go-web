@@ -193,6 +193,23 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 	return session, nil
 }
 
+// ReadAndVerifySession reads a session off a context and verifies it.
+// Note this will also inject the session into the context.
+func (sm *SessionManager) ReadAndVerifySession(context *RequestContext) (*Session, error) {
+	sessionID := sm.ReadSessionID(context)
+	if len(sessionID) > 0 {
+		session, err := sm.VerifySession(sessionID, context)
+		if err != nil {
+			return nil, err
+		}
+
+		context.SetSession(session)
+		return session, nil
+	}
+
+	return nil, nil
+}
+
 // Redirect returns a redirect result for when auth fails and you need to
 // send the user to a login page.
 func (sm *SessionManager) Redirect(context *RequestContext) ControllerResult {

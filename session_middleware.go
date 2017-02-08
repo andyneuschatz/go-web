@@ -17,32 +17,28 @@ func SessionAwareLockFree(action ControllerAction) ControllerAction {
 
 func sessionAware(action ControllerAction, sessionLockPolicy int) ControllerAction {
 	return func(context *RequestContext) ControllerResult {
-		sessionID := context.Auth().ReadSessionID(context)
-		if len(sessionID) > 0 {
-			session, err := context.auth.VerifySession(sessionID, context)
-			if err != nil {
-				return context.DefaultResultProvider().InternalError(err)
-			}
+		session, err := context.Auth().ReadAndVerifySession(context)
+		if err != nil {
+			return context.DefaultResultProvider().InternalError(err)
+		}
 
-			if session != nil {
-				switch sessionLockPolicy {
-				case SessionReadLock:
-					{
-						session.RLock()
-						defer session.RUnlock()
-						break
-					}
-				case SessionReadWriteLock:
-					{
-						session.Lock()
-						defer session.Unlock()
-						break
-					}
+		if session != nil {
+			switch sessionLockPolicy {
+			case SessionReadLock:
+				{
+					session.RLock()
+					defer session.RUnlock()
+					break
+				}
+			case SessionReadWriteLock:
+				{
+					session.Lock()
+					defer session.Unlock()
+					break
 				}
 			}
-
-			context.SetSession(session)
 		}
+
 		return action(context)
 	}
 }
