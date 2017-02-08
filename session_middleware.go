@@ -23,6 +23,8 @@ func sessionAware(action ControllerAction, sessionLockPolicy int) ControllerActi
 		}
 
 		if session != nil {
+			context.SetSession(session)
+
 			switch sessionLockPolicy {
 			case SessionReadLock:
 				{

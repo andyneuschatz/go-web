@@ -203,7 +203,6 @@ func (sm *SessionManager) ReadAndVerifySession(context *RequestContext) (*Sessio
 			return nil, err
 		}
 
-		context.SetSession(session)
 		return session, nil
 	}
 
