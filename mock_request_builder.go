@@ -75,6 +75,12 @@ func (mrb *MockRequestBuilder) Delete(pathFormat string, args ...interface{}) *M
 // WithPathf sets the path for the request.
 func (mrb *MockRequestBuilder) WithPathf(pathFormat string, args ...interface{}) *MockRequestBuilder {
 	mrb.path = fmt.Sprintf(pathFormat, args...)
+
+	// url.Parse always includes the '/' path prefix.
+	if !strings.HasPrefix(mrb.path, "/") {
+		mrb.path = fmt.Sprintf("/%s", mrb.path)
+	}
+
 	return mrb
 }
 
@@ -139,7 +145,9 @@ func (mrb *MockRequestBuilder) WithResponseBuffer(buffer *bytes.Buffer) *MockReq
 // Request returns the mock request builder settings as an http.Request.
 func (mrb *MockRequestBuilder) Request() (*http.Request, error) {
 	req := &http.Request{}
-	reqURL, err := url.Parse(fmt.Sprintf("http://localhost/%s", mrb.path))
+
+	reqURL, err := url.Parse(fmt.Sprintf("http://localhost%s", mrb.path))
+
 	if err != nil {
 		return nil, err
 	}
