@@ -75,8 +75,8 @@ type RequestContext struct {
 	session               *Session
 }
 
-// isolateTo isolates a request context to a transaction.
-func (rc *RequestContext) isolateTo(tx *sql.Tx) *RequestContext {
+// IsolateTo isolates a request context to a transaction.
+func (rc *RequestContext) IsolateTo(tx *sql.Tx) *RequestContext {
 	rc.tx = tx
 	return rc
 }
