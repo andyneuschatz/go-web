@@ -162,7 +162,7 @@ func (sm *SessionManager) Logout(userID int64, sessionID string, context *Reques
 
 // ReadSessionID reads a session id from a given request context.
 func (sm *SessionManager) ReadSessionID(context *RequestContext) string {
-	return context.GetCookie(sm.sessionParamName).Value
+	return context.Param(sm.sessionParamName)
 }
 
 // VerifySession checks a sessionID to see if it's valid.

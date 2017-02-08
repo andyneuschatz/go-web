@@ -499,7 +499,7 @@ func (a *App) renderAction(action ControllerAction) httprouter.Handle {
 
 func (a *App) setCommonResponseHeaders(w http.ResponseWriter) {
 	w.Header().Set("Vary", "Accept-Encoding")
-	w.Header().Set("X-Served-By", "github.com/wcharczuk/go-web")
+	w.Header().Set("X-Served-By", "github.com/blendlabs/go-web")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 	w.Header().Set("X-Xss-Protection", "1; mode=block")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
