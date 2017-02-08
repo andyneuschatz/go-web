@@ -76,6 +76,7 @@ func sessionRequired(action ControllerAction, sessionLockPolicy int) ControllerA
 		if err != nil {
 			return context.DefaultResultProvider().InternalError(err)
 		}
+
 		if session == nil {
 			if context.auth.loginRedirectHandler != nil {
 				redirectTo := context.auth.loginRedirectHandler(context.Request.URL)
