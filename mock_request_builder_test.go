@@ -43,7 +43,7 @@ func TestMockRequestBuilderFetchResponseAsJSON(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
 	app.GET("/test_path", func(r *RequestContext) ControllerResult {
-		return r.JSON([]string{"foo", "bar"})
+		return r.RawJSON([]string{"foo", "bar"})
 	})
 	var res []string
 	err := app.Mock().WithPathf("/test_path").FetchResponseAsJSON(&res)

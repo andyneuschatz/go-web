@@ -77,11 +77,11 @@ func (trp *TextResultProvider) BadRequest(message string) ControllerResult {
 	}
 }
 
-// Text returns a plaintext result.
-func (trp *TextResultProvider) Text(message string) ControllerResult {
+// Result returns a plaintext result.
+func (trp *TextResultProvider) Result(response interface{}) ControllerResult {
 	return &RawResult{
 		StatusCode:  http.StatusOK,
 		ContentType: ContentTypeText,
-		Body:        []byte(message),
+		Body:        []byte(fmt.Sprintf("%s", response)),
 	}
 }

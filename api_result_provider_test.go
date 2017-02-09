@@ -91,7 +91,7 @@ func TestAPIResultProviderOK(t *testing.T) {
 func TestAPIResultProviderJSON(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).JSON("foo")
+	result := NewAPIResultProvider(agent(), nil).Result("foo")
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)

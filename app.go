@@ -552,7 +552,7 @@ func (a *App) requestContext(w ResponseWriter, r *http.Request, p RouteParameter
 		// to apply the middleware sside effects to rc
 		NestMiddleware(controllerNoOp, a.defaultResultProvider)(rc)
 	} else {
-		rc.SetDefaultResultProvider(rc.API())
+		rc.SetDefaultResultProvider(rc.Text())
 	}
 
 	return rc

@@ -6,4 +6,5 @@ type ControllerResultProvider interface {
 	BadRequest(message string) ControllerResult
 	NotFound() ControllerResult
 	NotAuthorized() ControllerResult
+	Result(response interface{}) ControllerResult
 }

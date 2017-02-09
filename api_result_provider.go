@@ -25,7 +25,7 @@ func (ar *APIResultProvider) NotFound() ControllerResult {
 		Response: &APIResponse{
 			Meta: &APIResponseMeta{
 				StatusCode: http.StatusNotFound,
-				Message:    "Not Found.",
+				Message:    "Not Found",
 			},
 		},
 	}
@@ -103,8 +103,8 @@ func (ar *APIResultProvider) OK() ControllerResult {
 	}
 }
 
-// JSON returns a service response.
-func (ar *APIResultProvider) JSON(response interface{}) ControllerResult {
+// Result returns a service response.
+func (ar *APIResultProvider) Result(response interface{}) ControllerResult {
 	return &JSONResult{
 		StatusCode: http.StatusOK,
 		Response: &APIResponse{

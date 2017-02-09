@@ -3,6 +3,7 @@ package web
 import (
 	"database/sql"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -56,8 +57,12 @@ type RequestContext struct {
 	postBody []byte
 
 	//Private fields
-	api                   *APIResultProvider
-	view                  *ViewResultProvider
+	view *ViewResultProvider
+	api  *APIResultProvider
+
+	json *JSONResultProvider
+	xml  *XMLResultProvider
+
 	text                  *TextResultProvider
 	defaultResultProvider ControllerResultProvider
 	app                   *App
@@ -134,20 +139,36 @@ func (rc *RequestContext) TxRollback(rollbacker func() error) error {
 	return rollbacker()
 }
 
-// API returns the API result provider.
-func (rc *RequestContext) API() *APIResultProvider {
-	if rc.api == nil {
-		rc.api = NewAPIResultProvider(rc.diagnostics, rc)
-	}
-	return rc.api
-}
-
 // View returns the view result provider.
 func (rc *RequestContext) View() *ViewResultProvider {
 	if rc.view == nil {
 		rc.view = NewViewResultProvider(rc.app.diagnostics, rc.app.viewCache, rc)
 	}
 	return rc.view
+}
+
+// API returns the view result provider.
+func (rc *RequestContext) API() *APIResultProvider {
+	if rc.api == nil {
+		rc.api = NewAPIResultProvider(rc.app.diagnostics, rc)
+	}
+	return rc.api
+}
+
+// JSON returns the JSON result provider.
+func (rc *RequestContext) JSON() *JSONResultProvider {
+	if rc.json == nil {
+		rc.json = NewJSONResultProvider(rc.diagnostics, rc)
+	}
+	return rc.json
+}
+
+// XML returns the xml result provider.
+func (rc *RequestContext) XML() *XMLResultProvider {
+	if rc.xml == nil {
+		rc.xml = NewXMLResultProvider(rc.app.diagnostics, rc)
+	}
+	return rc.xml
 }
 
 // Text returns the text result provider.
@@ -226,7 +247,7 @@ func (rc *RequestContext) Param(name string) string {
 func (rc *RequestContext) ParamInt(name string) (int, error) {
 	paramValue := rc.Param(name)
 	if len(paramValue) == 0 {
-		return 0, parameterMissingError(name)
+		return 0, newParameterMissingError(name)
 	}
 	return strconv.Atoi(paramValue)
 }
@@ -235,7 +256,7 @@ func (rc *RequestContext) ParamInt(name string) (int, error) {
 func (rc *RequestContext) ParamInt64(name string) (int64, error) {
 	paramValue := rc.Param(name)
 	if len(paramValue) == 0 {
-		return 0, parameterMissingError(name)
+		return 0, newParameterMissingError(name)
 	}
 	return strconv.ParseInt(paramValue, 10, 64)
 }
@@ -244,7 +265,7 @@ func (rc *RequestContext) ParamInt64(name string) (int64, error) {
 func (rc *RequestContext) ParamFloat64(name string) (float64, error) {
 	paramValue := rc.Param(name)
 	if len(paramValue) == 0 {
-		return 0, parameterMissingError(name)
+		return 0, newParameterMissingError(name)
 	}
 	return strconv.ParseFloat(paramValue, 64)
 }
@@ -253,7 +274,7 @@ func (rc *RequestContext) ParamFloat64(name string) (float64, error) {
 func (rc *RequestContext) ParamTime(name, format string) (time.Time, error) {
 	paramValue := rc.Param(name)
 	if len(paramValue) == 0 {
-		return time.Time{}, parameterMissingError(name)
+		return time.Time{}, newParameterMissingError(name)
 	}
 	return time.Parse(format, paramValue)
 }
@@ -262,7 +283,7 @@ func (rc *RequestContext) ParamTime(name, format string) (time.Time, error) {
 func (rc *RequestContext) ParamBool(name string) (bool, error) {
 	paramValue := rc.Param(name)
 	if len(paramValue) == 0 {
-		return false, parameterMissingError(name)
+		return false, newParameterMissingError(name)
 	}
 	lower := strings.ToLower(paramValue)
 	return lower == "true" || lower == "1" || lower == "yes", nil
@@ -289,6 +310,11 @@ func (rc *RequestContext) PostBodyAsString() string {
 // PostBodyAsJSON reads the incoming post body (closing it) and marshals it to the target object as json.
 func (rc *RequestContext) PostBodyAsJSON(response interface{}) error {
 	return json.Unmarshal(rc.PostBody(), response)
+}
+
+// PostBodyAsXML reads the incoming post body (closing it) and marshals it to the target object as xml.
+func (rc *RequestContext) PostBodyAsXML(response interface{}) error {
+	return xml.Unmarshal(rc.PostBody(), response)
 }
 
 // PostedFiles returns any files posted
@@ -325,7 +351,7 @@ func (rc *RequestContext) PostedFiles() ([]PostedFile, error) {
 	return files, nil
 }
 
-func parameterMissingError(paramName string) error {
+func newParameterMissingError(paramName string) error {
 	return fmt.Errorf("`%s` parameter is missing", paramName)
 }
 
@@ -334,7 +360,7 @@ func (rc *RequestContext) RouteParamInt(key string) (int, error) {
 	if value, hasKey := rc.routeParameters[key]; hasKey {
 		return strconv.Atoi(value)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // RouteParamInt64 returns a route parameter as an integer.
@@ -342,7 +368,7 @@ func (rc *RequestContext) RouteParamInt64(key string) (int64, error) {
 	if value, hasKey := rc.routeParameters[key]; hasKey {
 		return strconv.ParseInt(value, 10, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // RouteParamFloat64 returns a route parameter as an float64.
@@ -350,7 +376,7 @@ func (rc *RequestContext) RouteParamFloat64(key string) (float64, error) {
 	if value, hasKey := rc.routeParameters[key]; hasKey {
 		return strconv.ParseFloat(value, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // RouteParam returns a string route parameter
@@ -358,7 +384,7 @@ func (rc *RequestContext) RouteParam(key string) (string, error) {
 	if value, hasKey := rc.routeParameters[key]; hasKey {
 		return value, nil
 	}
-	return StringEmpty, parameterMissingError(key)
+	return StringEmpty, newParameterMissingError(key)
 }
 
 // QueryParam returns a query parameter.
@@ -366,7 +392,7 @@ func (rc *RequestContext) QueryParam(key string) (string, error) {
 	if value := rc.Request.URL.Query().Get(key); len(value) > 0 {
 		return value, nil
 	}
-	return StringEmpty, parameterMissingError(key)
+	return StringEmpty, newParameterMissingError(key)
 }
 
 // QueryParamInt returns a query parameter as an integer.
@@ -374,7 +400,7 @@ func (rc *RequestContext) QueryParamInt(key string) (int, error) {
 	if value := rc.Request.URL.Query().Get(key); len(value) > 0 {
 		return strconv.Atoi(value)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // QueryParamInt64 returns a query parameter as an int64.
@@ -382,7 +408,7 @@ func (rc *RequestContext) QueryParamInt64(key string) (int64, error) {
 	if value := rc.Request.URL.Query().Get(key); len(value) > 0 {
 		return strconv.ParseInt(value, 10, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // QueryParamFloat64 returns a query parameter as a float64.
@@ -390,7 +416,7 @@ func (rc *RequestContext) QueryParamFloat64(key string) (float64, error) {
 	if value := rc.Request.URL.Query().Get(key); len(value) > 0 {
 		return strconv.ParseFloat(value, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // QueryParamTime returns a query parameter as a time.Time.
@@ -398,7 +424,7 @@ func (rc *RequestContext) QueryParamTime(key, format string) (time.Time, error) 
 	if value := rc.Request.URL.Query().Get(key); len(value) > 0 {
 		return time.Parse(format, value)
 	}
-	return time.Time{}, parameterMissingError(key)
+	return time.Time{}, newParameterMissingError(key)
 }
 
 // HeaderParam returns a header parameter value.
@@ -406,7 +432,7 @@ func (rc *RequestContext) HeaderParam(key string) (string, error) {
 	if value := rc.Request.Header.Get(key); len(value) > 0 {
 		return value, nil
 	}
-	return StringEmpty, parameterMissingError(key)
+	return StringEmpty, newParameterMissingError(key)
 }
 
 // HeaderParamInt returns a header parameter value as an integer.
@@ -414,7 +440,7 @@ func (rc *RequestContext) HeaderParamInt(key string) (int, error) {
 	if value := rc.Request.Header.Get(key); len(value) > 0 {
 		return strconv.Atoi(value)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // HeaderParamInt64 returns a header parameter value as an integer.
@@ -422,7 +448,7 @@ func (rc *RequestContext) HeaderParamInt64(key string) (int64, error) {
 	if value := rc.Request.Header.Get(key); len(value) > 0 {
 		return strconv.ParseInt(value, 10, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // HeaderParamFloat64 returns a header parameter value as an float64.
@@ -430,7 +456,7 @@ func (rc *RequestContext) HeaderParamFloat64(key string) (float64, error) {
 	if value := rc.Request.Header.Get(key); len(value) > 0 {
 		return strconv.ParseFloat(value, 64)
 	}
-	return 0, parameterMissingError(key)
+	return 0, newParameterMissingError(key)
 }
 
 // HeaderParamTime returns a header parameter value as an float64.
@@ -438,7 +464,7 @@ func (rc *RequestContext) HeaderParamTime(key, format string) (time.Time, error)
 	if value := rc.Request.Header.Get(key); len(value) > 0 {
 		return time.Parse(format, key)
 	}
-	return time.Time{}, parameterMissingError(key)
+	return time.Time{}, newParameterMissingError(key)
 }
 
 // GetCookie returns a named cookie from the request.
@@ -525,9 +551,17 @@ func (rc *RequestContext) RawWithContentType(contentType string, body []byte) *R
 	return &RawResult{ContentType: contentType, Body: body}
 }
 
-// JSON returns a basic json result.
-func (rc *RequestContext) JSON(object interface{}) *JSONResult {
+// RawJSON returns a basic json result.
+func (rc *RequestContext) RawJSON(object interface{}) *JSONResult {
 	return &JSONResult{
+		StatusCode: http.StatusOK,
+		Response:   object,
+	}
+}
+
+// RawXML returns a basic xml result.
+func (rc *RequestContext) RawXML(object interface{}) *XMLResult {
+	return &XMLResult{
 		StatusCode: http.StatusOK,
 		Response:   object,
 	}

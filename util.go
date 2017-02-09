@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"io"
 	"net"
 	"net/http"
@@ -25,6 +26,9 @@ const (
 
 	//ContentTypeJSON is the standard json content type.
 	ContentTypeJSON = "application/json; charset=utf-8"
+
+	//ContentTypeXML is the standard json content type.
+	ContentTypeXML = "text/xml; charset=utf-8"
 
 	// ContentTypeText is the standard plaintext content type.
 	ContentTypeText = "text/plain; charset=utf-8"
@@ -72,6 +76,16 @@ func WriteJSON(w http.ResponseWriter, r *http.Request, statusCode int, response 
 	w.WriteHeader(statusCode)
 
 	enc := json.NewEncoder(w)
+	err := enc.Encode(response)
+	return exception.Wrap(err)
+}
+
+// WriteXML marshalls an object to json.
+func WriteXML(w http.ResponseWriter, r *http.Request, statusCode int, response interface{}) error {
+	w.Header().Set(HeaderContentType, ContentTypeXML)
+	w.WriteHeader(statusCode)
+
+	enc := xml.NewEncoder(w)
 	err := enc.Encode(response)
 	return exception.Wrap(err)
 }

@@ -89,3 +89,8 @@ func (vr *ViewResultProvider) View(viewName string, viewModel interface{}) Contr
 		viewCache:  vr.viewCache,
 	}
 }
+
+// Result doesnt return a view result.
+func (vr *ViewResultProvider) Result(response interface{}) ControllerResult {
+	panic("ViewResultProvider.Result is not implemented")
+}

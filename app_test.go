@@ -189,7 +189,7 @@ func TestAppDefaultResultProvider(t *testing.T) {
 
 	rc := app.requestContext(nil, nil, nil)
 	assert.Nil(rc.view)
-	assert.NotNil(rc.api)
+	assert.NotNil(rc.text, "rc.text should be provided as default")
 	assert.NotNil(rc.defaultResultProvider)
 }
 

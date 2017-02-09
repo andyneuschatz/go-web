@@ -17,7 +17,7 @@ func TestSessionAware(t *testing.T) {
 
 	app.GET("/", func(r *RequestContext) ControllerResult {
 		sessionWasSet = r.Session() != nil
-		return r.Text().Text("COOL")
+		return r.Text().Result("COOL")
 	}, SessionAware)
 
 	app.Auth().SessionCache().Add(&Session{
@@ -45,7 +45,7 @@ func TestSessionRequired(t *testing.T) {
 
 	app.GET("/", func(r *RequestContext) ControllerResult {
 		sessionWasSet = r.Session() != nil
-		return r.Text().Text("COOL")
+		return r.Text().Result("COOL")
 	}, SessionRequired)
 
 	app.Auth().SessionCache().Add(&Session{
@@ -74,7 +74,7 @@ func TestSessionRequiredCustomParamName(t *testing.T) {
 
 	app.GET("/", func(r *RequestContext) ControllerResult {
 		sessionWasSet = r.Session() != nil
-		return r.Text().Text("COOL")
+		return r.Text().Result("COOL")
 	}, SessionRequired)
 
 	app.Auth().SessionCache().Add(&Session{
