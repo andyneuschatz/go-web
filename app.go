@@ -139,6 +139,7 @@ func (a *App) SetDiagnostics(da *logger.DiagnosticsAgent) {
 	a.diagnostics = da
 	if a.diagnostics != nil {
 		a.diagnostics.AddEventListener(logger.EventWebRequestStart, a.onRequestStart)
+		a.diagnostics.AddEventListener(logger.EventWebRequestPostBody, a.onRequestPostBody)
 		a.diagnostics.AddEventListener(logger.EventWebRequest, a.onRequestComplete)
 		a.diagnostics.AddEventListener(logger.EventWebResponse, a.onResponse)
 	}
@@ -183,6 +184,19 @@ func (a *App) onRequestStart(writer logger.Logger, ts logger.TimeSource, eventFl
 		return
 	}
 	logger.WriteRequestStart(writer, ts, context.Request)
+}
+
+func (a *App) onRequestPostBody(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	if len(state) < 1 {
+		return
+	}
+
+	body, isBody := state[0].([]byte)
+	if !isBody {
+		return
+	}
+
+	logger.WriteRequestBody(writer, ts, body)
 }
 
 func (a *App) onRequestComplete(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
