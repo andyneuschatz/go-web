@@ -186,6 +186,9 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 		return nil, err
 	}
 	if session == nil || session.IsZero() {
+		if context != nil {
+			context.ExpireCookie(sm.SessionParamName())
+		}
 		return nil, nil
 	}
 
