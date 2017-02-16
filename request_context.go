@@ -484,10 +484,8 @@ func (rc *RequestContext) WriteCookie(cookie *http.Cookie) {
 func (rc *RequestContext) getCookieDomain() string {
 	if rc.app != nil && len(rc.app.domain) > 0 {
 		return rc.app.domain
-	} else {
-		return rc.Request.Host
 	}
-	return ""
+	return rc.Request.Host
 }
 
 // WriteNewCookie is a helper method for WriteCookie.
