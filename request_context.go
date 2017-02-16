@@ -501,25 +501,27 @@ func (rc *RequestContext) WriteNewCookie(name string, value string, expires *tim
 }
 
 // ExtendCookieByDuration extends a cookie by a time duration (on the order of nanoseconds to hours).
-func (rc *RequestContext) ExtendCookieByDuration(name string, duration time.Duration) {
+func (rc *RequestContext) ExtendCookieByDuration(name string, path string, duration time.Duration) {
 	cookie := rc.GetCookie(name)
+	cookie.Path = path
 	cookie.Expires = cookie.Expires.Add(duration)
 	rc.WriteCookie(cookie)
 }
 
 // ExtendCookie extends a cookie by years, months or days.
-func (rc *RequestContext) ExtendCookie(name string, years, months, days int) {
+func (rc *RequestContext) ExtendCookie(name string, path string, years, months, days int) {
 	cookie := rc.GetCookie(name)
+	cookie.Path = path
 	cookie.Expires.AddDate(years, months, days)
 	rc.WriteCookie(cookie)
 }
 
 // ExpireCookie expires a cookie.
-func (rc *RequestContext) ExpireCookie(name string) {
-	c := http.Cookie{}
-	c.Name = name
+func (rc *RequestContext) ExpireCookie(name string, path string) {
+	c := rc.GetCookie(name)
+	c.Path = path
 	c.Expires = time.Now().UTC().AddDate(-1, 0, 0)
-	rc.WriteCookie(&c)
+	rc.WriteCookie(c)
 }
 
 // --------------------------------------------------------------------------------

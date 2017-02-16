@@ -18,6 +18,9 @@ const (
 
 	// SessionReadWriteLock is a lock policy that acquires both a read and a write lock on session.
 	SessionReadWriteLock = 2
+
+	// DefaultSessionCookiePath is the default cookie path.
+	DefaultSessionCookiePath = "/"
 )
 
 // NewSessionID returns a new session id.
@@ -132,9 +135,9 @@ func (sm *SessionManager) Login(userID int64, context *RequestContext) (*Session
 func (sm *SessionManager) InjectSessionCookie(context *RequestContext, sessionID string) {
 	if context != nil {
 		if sm.sessionCookieIsSessionBound {
-			context.WriteNewCookie(sm.sessionParamName, sessionID, nil, "/", sm.IsCookieSecure())
+			context.WriteNewCookie(sm.sessionParamName, sessionID, nil, DefaultSessionCookiePath, sm.IsCookieSecure())
 		} else if sm.sessionCookieTimeoutProvider != nil {
-			context.WriteNewCookie(sm.sessionParamName, sessionID, sm.sessionCookieTimeoutProvider(context), "/", sm.IsCookieSecure())
+			context.WriteNewCookie(sm.sessionParamName, sessionID, sm.sessionCookieTimeoutProvider(context), DefaultSessionCookiePath, sm.IsCookieSecure())
 		}
 	}
 }
@@ -149,7 +152,7 @@ func (sm *SessionManager) Logout(userID int64, sessionID string, context *Reques
 	sm.sessionCache.Expire(sessionID)
 
 	if context != nil {
-		context.ExpireCookie(sm.sessionParamName)
+		context.ExpireCookie(sm.sessionParamName, DefaultSessionCookiePath)
 	}
 	if sm.removeHandler != nil {
 		if context != nil {
@@ -173,7 +176,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 
 	if sm.fetchHandler == nil {
 		if context != nil {
-			context.ExpireCookie(sm.SessionParamName())
+			context.ExpireCookie(sm.sessionParamName, DefaultSessionCookiePath)
 		}
 		return nil, nil
 	}
@@ -190,7 +193,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 	}
 	if session == nil || session.IsZero() {
 		if context != nil {
-			context.ExpireCookie(sm.SessionParamName())
+			context.ExpireCookie(sm.sessionParamName, DefaultSessionCookiePath)
 		}
 		return nil, nil
 	}
