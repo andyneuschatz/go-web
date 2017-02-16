@@ -172,6 +172,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 	}
 
 	if sm.fetchHandler == nil {
+		context.ExpireCookie(sm.SessionParamName())
 		return nil, nil
 	}
 
