@@ -56,7 +56,7 @@ func TestAPIResultProviderInternalErrorWritesToLogger(t *testing.T) {
 		assert.Len(state, 2)
 	})
 
-	rc, err := app.Mock().RequestContext(nil)
+	rc, err := app.Mock().Ctx(nil)
 	assert.Nil(err)
 	result := rc.API().InternalError(exception.New("Test"))
 	assert.NotNil(result)

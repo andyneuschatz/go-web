@@ -9,12 +9,12 @@ type RedirectResult struct {
 }
 
 // Render writes the result to the response.
-func (rr *RedirectResult) Render(rc *RequestContext) error {
+func (rr *RedirectResult) Render(ctx *Ctx) error {
 	if len(rr.Method) > 0 {
-		rc.Request.Method = rr.Method
-		http.Redirect(rc.Response, rc.Request, rr.RedirectURI, http.StatusFound)
+		ctx.Request.Method = rr.Method
+		http.Redirect(ctx.Response, ctx.Request, rr.RedirectURI, http.StatusFound)
 	} else {
-		http.Redirect(rc.Response, rc.Request, rr.RedirectURI, http.StatusTemporaryRedirect)
+		http.Redirect(ctx.Response, ctx.Request, rr.RedirectURI, http.StatusTemporaryRedirect)
 	}
 
 	return nil

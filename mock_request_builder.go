@@ -197,8 +197,8 @@ func (mrb *MockRequestBuilder) Request() (*http.Request, error) {
 	return req, nil
 }
 
-// RequestContext returns the mock request as a request context.
-func (mrb *MockRequestBuilder) RequestContext(p RouteParameters) (*RequestContext, error) {
+// Ctx returns the mock request as a request context.
+func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 	r, err := mrb.Request()
 
 	if err != nil {
@@ -213,11 +213,11 @@ func (mrb *MockRequestBuilder) RequestContext(p RouteParameters) (*RequestContex
 	}
 
 	w := NewMockResponseWriter(buffer)
-	var rc *RequestContext
+	var rc *Ctx
 	if mrb.app != nil {
-		rc = mrb.app.requestContext(w, r, p)
+		rc = mrb.app.newCtx(w, r, p)
 	} else {
-		rc = NewRequestContext(w, r, p)
+		rc = NewCtx(w, r, p)
 	}
 
 	return rc, nil
@@ -233,11 +233,11 @@ func (mrb *MockRequestBuilder) FetchResponse() (res *http.Response, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if mrb.app.panicHandler != nil {
-				rc, _ := mrb.RequestContext(nil)
+				rc, _ := mrb.Ctx(nil)
 				controllerResult := mrb.app.panicHandler(rc, r)
 				panicRecoveryBuffer := bytes.NewBuffer([]byte{})
 				panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
-				err = controllerResult.Render(NewRequestContext(panicRecoveryWriter, rc.Request, rc.routeParameters))
+				err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
 				res = &http.Response{
 					Body:          ioutil.NopCloser(bytes.NewBuffer(panicRecoveryBuffer.Bytes())),
 					ContentLength: int64(panicRecoveryWriter.ContentLength()),

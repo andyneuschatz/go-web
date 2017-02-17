@@ -15,7 +15,7 @@ func TestSessionAware(t *testing.T) {
 	var sessionWasSet bool
 	app := New()
 
-	app.GET("/", func(r *RequestContext) ControllerResult {
+	app.GET("/", func(r *Ctx) Result {
 		sessionWasSet = r.Session() != nil
 		return r.Text().Result("COOL")
 	}, SessionAware)
@@ -43,7 +43,7 @@ func TestSessionRequired(t *testing.T) {
 	var sessionWasSet bool
 	app := New()
 
-	app.GET("/", func(r *RequestContext) ControllerResult {
+	app.GET("/", func(r *Ctx) Result {
 		sessionWasSet = r.Session() != nil
 		return r.Text().Result("COOL")
 	}, SessionRequired)
@@ -72,7 +72,7 @@ func TestSessionRequiredCustomParamName(t *testing.T) {
 	app := New()
 	app.Auth().SetSessionParamName("web_auth")
 
-	app.GET("/", func(r *RequestContext) ControllerResult {
+	app.GET("/", func(r *Ctx) Result {
 		sessionWasSet = r.Session() != nil
 		return r.Text().Result("COOL")
 	}, SessionRequired)

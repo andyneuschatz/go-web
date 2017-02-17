@@ -8,18 +8,18 @@ import (
 )
 
 // NewAPIResultProvider Creates a new JSONResults object.
-func NewAPIResultProvider(diag *logger.DiagnosticsAgent, r *RequestContext) *APIResultProvider {
-	return &APIResultProvider{diagnostics: diag, requestContext: r}
+func NewAPIResultProvider(diag *logger.DiagnosticsAgent, ctx *Ctx) *APIResultProvider {
+	return &APIResultProvider{diagnostics: diag, ctx: ctx}
 }
 
 // APIResultProvider are context results for api methods.
 type APIResultProvider struct {
-	diagnostics    *logger.DiagnosticsAgent
-	requestContext *RequestContext
+	diagnostics *logger.DiagnosticsAgent
+	ctx         *Ctx
 }
 
 // NotFound returns a service response.
-func (ar *APIResultProvider) NotFound() ControllerResult {
+func (ar *APIResultProvider) NotFound() Result {
 	return &JSONResult{
 		StatusCode: http.StatusNotFound,
 		Response: &APIResponse{
@@ -32,7 +32,7 @@ func (ar *APIResultProvider) NotFound() ControllerResult {
 }
 
 // NotAuthorized returns a service response.
-func (ar *APIResultProvider) NotAuthorized() ControllerResult {
+func (ar *APIResultProvider) NotAuthorized() Result {
 	return &JSONResult{
 		StatusCode: http.StatusForbidden,
 		Response: &APIResponse{
@@ -45,10 +45,10 @@ func (ar *APIResultProvider) NotAuthorized() ControllerResult {
 }
 
 // InternalError returns a service response.
-func (ar *APIResultProvider) InternalError(err error) ControllerResult {
+func (ar *APIResultProvider) InternalError(err error) Result {
 	if ar.diagnostics != nil {
-		if ar.requestContext != nil {
-			ar.diagnostics.FatalWithReq(err, ar.requestContext.Request)
+		if ar.ctx != nil {
+			ar.diagnostics.FatalWithReq(err, ar.ctx.Request)
 		} else {
 			ar.diagnostics.FatalWithReq(err, nil)
 		}
@@ -78,7 +78,7 @@ func (ar *APIResultProvider) InternalError(err error) ControllerResult {
 }
 
 // BadRequest returns a service response.
-func (ar *APIResultProvider) BadRequest(message string) ControllerResult {
+func (ar *APIResultProvider) BadRequest(message string) Result {
 	return &JSONResult{
 		StatusCode: http.StatusBadRequest,
 		Response: &APIResponse{
@@ -91,7 +91,7 @@ func (ar *APIResultProvider) BadRequest(message string) ControllerResult {
 }
 
 // OK returns a service response.
-func (ar *APIResultProvider) OK() ControllerResult {
+func (ar *APIResultProvider) OK() Result {
 	return &JSONResult{
 		StatusCode: http.StatusOK,
 		Response: &APIResponse{
@@ -104,7 +104,7 @@ func (ar *APIResultProvider) OK() ControllerResult {
 }
 
 // Result returns a service response.
-func (ar *APIResultProvider) Result(response interface{}) ControllerResult {
+func (ar *APIResultProvider) Result(response interface{}) Result {
 	return &JSONResult{
 		StatusCode: http.StatusOK,
 		Response: &APIResponse{

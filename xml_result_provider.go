@@ -8,18 +8,18 @@ import (
 )
 
 // NewXMLResultProvider Creates a new JSONResults object.
-func NewXMLResultProvider(diag *logger.DiagnosticsAgent, r *RequestContext) *XMLResultProvider {
-	return &XMLResultProvider{diagnostics: diag, requestContext: r}
+func NewXMLResultProvider(diag *logger.DiagnosticsAgent, ctx *Ctx) *XMLResultProvider {
+	return &XMLResultProvider{diagnostics: diag, ctx: ctx}
 }
 
 // XMLResultProvider are context results for api methods.
 type XMLResultProvider struct {
-	diagnostics    *logger.DiagnosticsAgent
-	requestContext *RequestContext
+	diagnostics *logger.DiagnosticsAgent
+	ctx         *Ctx
 }
 
 // NotFound returns a service response.
-func (xrp *XMLResultProvider) NotFound() ControllerResult {
+func (xrp *XMLResultProvider) NotFound() Result {
 	return &XMLResult{
 		StatusCode: http.StatusNotFound,
 		Response:   "Not Found",
@@ -27,7 +27,7 @@ func (xrp *XMLResultProvider) NotFound() ControllerResult {
 }
 
 // NotAuthorized returns a service response.
-func (xrp *XMLResultProvider) NotAuthorized() ControllerResult {
+func (xrp *XMLResultProvider) NotAuthorized() Result {
 	return &XMLResult{
 		StatusCode: http.StatusForbidden,
 		Response:   "Not Authorized",
@@ -35,10 +35,10 @@ func (xrp *XMLResultProvider) NotAuthorized() ControllerResult {
 }
 
 // InternalError returns a service response.
-func (xrp *XMLResultProvider) InternalError(err error) ControllerResult {
+func (xrp *XMLResultProvider) InternalError(err error) Result {
 	if xrp.diagnostics != nil {
-		if xrp.requestContext != nil {
-			xrp.diagnostics.FatalWithReq(err, xrp.requestContext.Request)
+		if xrp.ctx != nil {
+			xrp.diagnostics.FatalWithReq(err, xrp.ctx.Request)
 		} else {
 			xrp.diagnostics.FatalWithReq(err, nil)
 		}
@@ -58,7 +58,7 @@ func (xrp *XMLResultProvider) InternalError(err error) ControllerResult {
 }
 
 // BadRequest returns a service response.
-func (xrp *XMLResultProvider) BadRequest(message string) ControllerResult {
+func (xrp *XMLResultProvider) BadRequest(message string) Result {
 	return &XMLResult{
 		StatusCode: http.StatusBadRequest,
 		Response:   message,
@@ -66,7 +66,7 @@ func (xrp *XMLResultProvider) BadRequest(message string) ControllerResult {
 }
 
 // OK returns a service response.
-func (xrp *XMLResultProvider) OK() ControllerResult {
+func (xrp *XMLResultProvider) OK() Result {
 	return &XMLResult{
 		StatusCode: http.StatusOK,
 		Response:   "OK!",
@@ -74,7 +74,7 @@ func (xrp *XMLResultProvider) OK() ControllerResult {
 }
 
 // Result returns an xml response.
-func (xrp *XMLResultProvider) Result(response interface{}) ControllerResult {
+func (xrp *XMLResultProvider) Result(response interface{}) Result {
 	return &XMLResult{
 		StatusCode: http.StatusOK,
 		Response:   response,

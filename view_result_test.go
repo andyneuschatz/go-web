@@ -14,7 +14,7 @@ func TestViewResultRender(t *testing.T) {
 	assert := assert.New(t)
 
 	buffer := bytes.NewBuffer([]byte{})
-	rc, err := NewMockRequestBuilder(nil).WithResponseBuffer(buffer).RequestContext(nil)
+	rc, err := NewMockRequestBuilder(nil).WithResponseBuffer(buffer).Ctx(nil)
 	assert.Nil(err)
 
 	testView := template.New("testView")

@@ -6,8 +6,8 @@ import "net/http"
 type NoContentResult struct{}
 
 // Render renders a static result.
-func (ncr *NoContentResult) Render(rc *RequestContext) error {
-	rc.Response.WriteHeader(http.StatusNoContent)
-	_, err := rc.Response.Write([]byte{})
+func (ncr *NoContentResult) Render(ctx *Ctx) error {
+	ctx.Response.WriteHeader(http.StatusNoContent)
+	_, err := ctx.Response.Write([]byte{})
 	return err
 }

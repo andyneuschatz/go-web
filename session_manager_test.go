@@ -11,7 +11,7 @@ func TestSessionManagerLogin(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
-	rc, _ := app.Mock().RequestContext(nil)
+	rc, _ := app.Mock().Ctx(nil)
 
 	sm := NewSessionManager()
 	session, err := sm.Login(1, rc)
@@ -29,11 +29,11 @@ func TestSessionManagerLoginWithPersist(t *testing.T) {
 	sessions := map[string]*Session{}
 
 	app := New()
-	rc, _ := app.Mock().RequestContext(nil)
+	rc, _ := app.Mock().Ctx(nil)
 
 	didCallPersist := false
 	sm := NewSessionManager()
-	sm.SetPersistHandler(func(c *RequestContext, s *Session, tx *sql.Tx) error {
+	sm.SetPersistHandler(func(c *Ctx, s *Session, tx *sql.Tx) error {
 		didCallPersist = true
 		sessions[s.SessionID] = s
 		return nil

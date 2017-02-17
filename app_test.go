@@ -30,14 +30,14 @@ func TestAppInitializeConfig(t *testing.T) {
 	assert.Equal("8080", app.Config().(*myConfig).Port)
 }
 
-func TestAppRequestContext(t *testing.T) {
+func TestAppCtx(t *testing.T) {
 	assert := assert.New(t)
 
 	response := bytes.NewBuffer([]byte{})
 
 	app := New()
 
-	rc, err := app.Mock().WithResponseBuffer(response).RequestContext(nil)
+	rc, err := app.Mock().WithResponseBuffer(response).Ctx(nil)
 	assert.Nil(err)
 	assert.NotNil(rc)
 	assert.NotNil(rc.diagnostics)
@@ -86,13 +86,13 @@ func TestAppMiddleWarePipeline(t *testing.T) {
 
 	didRun := false
 	app.GET("/",
-		func(r *RequestContext) ControllerResult { return r.Raw([]byte("OK!")) },
-		func(action ControllerAction) ControllerAction {
+		func(r *Ctx) Result { return r.Raw([]byte("OK!")) },
+		func(action Action) Action {
 			didRun = true
 			return action
 		},
-		func(action ControllerAction) ControllerAction {
-			return func(r *RequestContext) ControllerResult {
+		func(action Action) Action {
+			return func(r *Ctx) Result {
 				return r.Raw([]byte("foo"))
 			}
 		},
@@ -111,7 +111,7 @@ func TestAppMockTransactions(t *testing.T) {
 	tx := &sql.Tx{}
 	app.IsolateTo(tx)
 
-	var action = func(r *RequestContext) ControllerResult {
+	var action = func(r *Ctx) Result {
 		assert.NotNil(r.Tx())
 		return r.Raw([]byte("OK!"))
 	}
@@ -135,7 +135,7 @@ func TestAppStatic(t *testing.T) {
 func TestAppStaticSingleFile(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
-	app.GET("/", func(r *RequestContext) ControllerResult {
+	app.GET("/", func(r *Ctx) Result {
 		return r.Static("testdata/test_file.html")
 	})
 
@@ -147,7 +147,7 @@ func TestAppStaticSingleFile(t *testing.T) {
 func TestAppProviderMiddleware(t *testing.T) {
 	assert := assert.New(t)
 
-	var okAction = func(r *RequestContext) ControllerResult {
+	var okAction = func(r *Ctx) Result {
 		assert.NotNil(r.DefaultResultProvider())
 		return r.Raw([]byte("OK!"))
 	}
@@ -164,13 +164,13 @@ func TestAppProviderMiddlewareOrder(t *testing.T) {
 
 	app := New()
 
-	var okAction = func(r *RequestContext) ControllerResult {
+	var okAction = func(r *Ctx) Result {
 		assert.NotNil(r.DefaultResultProvider())
 		return r.Raw([]byte("OK!"))
 	}
 
-	var dependsOnProvider = func(action ControllerAction) ControllerAction {
-		return func(r *RequestContext) ControllerResult {
+	var dependsOnProvider = func(action Action) Action {
+		return func(r *Ctx) Result {
 			assert.NotNil(r.DefaultResultProvider())
 			return action(r)
 		}
@@ -187,7 +187,7 @@ func TestAppDefaultResultProvider(t *testing.T) {
 	app := New()
 	assert.NotNil(app.DefaultResultProvider())
 
-	rc := app.requestContext(nil, nil, nil)
+	rc := app.newCtx(nil, nil, nil)
 	assert.Nil(rc.view)
 	assert.NotNil(rc.text, "rc.text should be provided as default")
 	assert.NotNil(rc.defaultResultProvider)
@@ -199,7 +199,7 @@ func TestAppDefaultResultProviderWithDefault(t *testing.T) {
 	app.SetDefaultResultProvider(ViewProviderAsDefault)
 	assert.NotNil(app.DefaultResultProvider())
 
-	rc := app.requestContext(nil, nil, nil)
+	rc := app.newCtx(nil, nil, nil)
 	assert.NotNil(rc.view)
 	assert.Nil(rc.api)
 	assert.NotNil(rc.defaultResultProvider)
@@ -224,7 +224,7 @@ func TestAppViewResult(t *testing.T) {
 
 	app := New()
 	app.View().AddPaths("testdata/test_file.html")
-	app.GET("/", func(r *RequestContext) ControllerResult {
+	app.GET("/", func(r *Ctx) Result {
 		return r.View().View("test", "foobarbaz")
 	})
 

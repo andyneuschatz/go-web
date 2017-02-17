@@ -35,21 +35,21 @@ const (
 )
 
 // NestMiddleware reads the middleware variadic args and organizes the calls recursively in the order they appear.
-func NestMiddleware(action ControllerAction, middleware ...ControllerMiddleware) ControllerAction {
+func NestMiddleware(action Action, middleware ...Middleware) Action {
 	if len(middleware) == 0 {
 		return action
 	}
 
-	var nest = func(a, b ControllerMiddleware) ControllerMiddleware {
+	var nest = func(a, b Middleware) Middleware {
 		if b == nil {
 			return a
 		}
-		return func(action ControllerAction) ControllerAction {
+		return func(action Action) Action {
 			return a(b(action))
 		}
 	}
 
-	var metaAction ControllerMiddleware
+	var metaAction Middleware
 	for _, step := range middleware {
 		metaAction = nest(step, metaAction)
 	}
@@ -113,12 +113,12 @@ func LocalIP() string {
 	return ""
 }
 
-func newHandleShim(app *App, handler ControllerAction) http.Handler {
+func newHandleShim(app *App, handler Action) http.Handler {
 	return &handleShim{action: handler, app: app}
 }
 
 type handleShim struct {
-	action ControllerAction
+	action Action
 	app    *App
 }
 

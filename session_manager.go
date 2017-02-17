@@ -42,7 +42,7 @@ func NewSessionManager() *SessionManager {
 // SessionManager is a manager for sessions.
 type SessionManager struct {
 	sessionCache         *SessionCache
-	persistHandler       func(*RequestContext, *Session, *sql.Tx) error
+	persistHandler       func(*Ctx, *Session, *sql.Tx) error
 	fetchHandler         func(sessionID string, tx *sql.Tx) (*Session, error)
 	removeHandler        func(sessionID string, tx *sql.Tx) error
 	validateHandler      func(*Session, *sql.Tx) error
@@ -51,7 +51,7 @@ type SessionManager struct {
 
 	sessionCookieIsSessionBound  bool
 	sessionCookieIsSecure        *bool
-	sessionCookieTimeoutProvider func(rc *RequestContext) *time.Time
+	sessionCookieTimeoutProvider func(rc *Ctx) *time.Time
 }
 
 // SetCookiesAsSessionBound sets the session issued cookies to be deleted after the browser closes.
@@ -61,7 +61,7 @@ func (sm *SessionManager) SetCookiesAsSessionBound() {
 }
 
 // SetCookieTimeout sets the cookies to the given timeout.
-func (sm *SessionManager) SetCookieTimeout(timeoutProvider func(rc *RequestContext) *time.Time) {
+func (sm *SessionManager) SetCookieTimeout(timeoutProvider func(rc *Ctx) *time.Time) {
 	sm.sessionCookieIsSessionBound = false
 	sm.sessionCookieTimeoutProvider = timeoutProvider
 }
@@ -83,7 +83,7 @@ func (sm *SessionManager) SetSessionParamName(paramName string) {
 }
 
 // SetPersistHandler sets the persist handler
-func (sm *SessionManager) SetPersistHandler(handler func(*RequestContext, *Session, *sql.Tx) error) {
+func (sm *SessionManager) SetPersistHandler(handler func(*Ctx, *Session, *sql.Tx) error) {
 	sm.persistHandler = handler
 }
 
@@ -114,7 +114,7 @@ func (sm SessionManager) SessionCache() *SessionCache {
 }
 
 // Login logs a userID in.
-func (sm *SessionManager) Login(userID int64, context *RequestContext) (*Session, error) {
+func (sm *SessionManager) Login(userID int64, context *Ctx) (*Session, error) {
 	sessionID := NewSessionID()
 	session := NewSession(userID, sessionID)
 
@@ -132,7 +132,7 @@ func (sm *SessionManager) Login(userID int64, context *RequestContext) (*Session
 }
 
 // InjectSessionCookie injects a session cookie into the context.
-func (sm *SessionManager) InjectSessionCookie(context *RequestContext, sessionID string) {
+func (sm *SessionManager) InjectSessionCookie(context *Ctx, sessionID string) {
 	if context != nil {
 		if sm.sessionCookieIsSessionBound {
 			context.WriteNewCookie(sm.sessionParamName, sessionID, nil, DefaultSessionCookiePath, sm.IsCookieSecure())
@@ -148,7 +148,7 @@ func (sm *SessionManager) IsCookieSecure() bool {
 }
 
 // Logout un-authenticates a session.
-func (sm *SessionManager) Logout(userID int64, sessionID string, context *RequestContext) error {
+func (sm *SessionManager) Logout(userID int64, sessionID string, context *Ctx) error {
 	sm.sessionCache.Expire(sessionID)
 
 	if context != nil {
@@ -164,12 +164,12 @@ func (sm *SessionManager) Logout(userID int64, sessionID string, context *Reques
 }
 
 // ReadSessionID reads a session id from a given request context.
-func (sm *SessionManager) ReadSessionID(context *RequestContext) string {
+func (sm *SessionManager) ReadSessionID(context *Ctx) string {
 	return context.Param(sm.sessionParamName)
 }
 
 // VerifySession checks a sessionID to see if it's valid.
-func (sm *SessionManager) VerifySession(sessionID string, context *RequestContext) (*Session, error) {
+func (sm *SessionManager) VerifySession(sessionID string, context *Ctx) (*Session, error) {
 	if sm.sessionCache.IsActive(sessionID) {
 		return sm.sessionCache.Get(sessionID), nil
 	}
@@ -204,7 +204,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *RequestContex
 
 // ReadAndVerifySession reads a session off a context and verifies it.
 // Note this will also inject the session into the context.
-func (sm *SessionManager) ReadAndVerifySession(context *RequestContext) (*Session, error) {
+func (sm *SessionManager) ReadAndVerifySession(context *Ctx) (*Session, error) {
 	sessionID := sm.ReadSessionID(context)
 	if len(sessionID) > 0 {
 		session, err := sm.VerifySession(sessionID, context)
@@ -220,7 +220,7 @@ func (sm *SessionManager) ReadAndVerifySession(context *RequestContext) (*Sessio
 
 // Redirect returns a redirect result for when auth fails and you need to
 // send the user to a login page.
-func (sm *SessionManager) Redirect(context *RequestContext) ControllerResult {
+func (sm *SessionManager) Redirect(context *Ctx) Result {
 	if sm.loginRedirectHandler != nil {
 		redirectTo := context.auth.loginRedirectHandler(context.Request.URL)
 		if redirectTo != nil {

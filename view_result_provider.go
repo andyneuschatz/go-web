@@ -21,19 +21,19 @@ const (
 )
 
 // NewViewResultProvider creates a new ViewResults object.
-func NewViewResultProvider(diag *logger.DiagnosticsAgent, vc *ViewCache, r *RequestContext) *ViewResultProvider {
-	return &ViewResultProvider{diagnostics: diag, viewCache: vc, requestContext: r}
+func NewViewResultProvider(diag *logger.DiagnosticsAgent, vc *ViewCache, r *Ctx) *ViewResultProvider {
+	return &ViewResultProvider{diagnostics: diag, viewCache: vc, ctx: r}
 }
 
 // ViewResultProvider returns results based on views.
 type ViewResultProvider struct {
-	diagnostics    *logger.DiagnosticsAgent
-	requestContext *RequestContext
-	viewCache      *ViewCache
+	diagnostics *logger.DiagnosticsAgent
+	ctx         *Ctx
+	viewCache   *ViewCache
 }
 
 // BadRequest returns a view result.
-func (vr *ViewResultProvider) BadRequest(message string) ControllerResult {
+func (vr *ViewResultProvider) BadRequest(message string) Result {
 	return &ViewResult{
 		StatusCode: http.StatusBadRequest,
 		ViewModel:  message,
@@ -43,10 +43,10 @@ func (vr *ViewResultProvider) BadRequest(message string) ControllerResult {
 }
 
 // InternalError returns a view result.
-func (vr *ViewResultProvider) InternalError(err error) ControllerResult {
+func (vr *ViewResultProvider) InternalError(err error) Result {
 	if vr.diagnostics != nil {
-		if vr.requestContext != nil {
-			vr.diagnostics.FatalWithReq(err, vr.requestContext.Request)
+		if vr.ctx != nil {
+			vr.diagnostics.FatalWithReq(err, vr.ctx.Request)
 		} else {
 			vr.diagnostics.FatalWithReq(err, nil)
 		}
@@ -61,7 +61,7 @@ func (vr *ViewResultProvider) InternalError(err error) ControllerResult {
 }
 
 // NotFound returns a view result.
-func (vr *ViewResultProvider) NotFound() ControllerResult {
+func (vr *ViewResultProvider) NotFound() Result {
 	return &ViewResult{
 		StatusCode: http.StatusNotFound,
 		ViewModel:  nil,
@@ -71,7 +71,7 @@ func (vr *ViewResultProvider) NotFound() ControllerResult {
 }
 
 // NotAuthorized returns a view result.
-func (vr *ViewResultProvider) NotAuthorized() ControllerResult {
+func (vr *ViewResultProvider) NotAuthorized() Result {
 	return &ViewResult{
 		StatusCode: http.StatusForbidden,
 		ViewModel:  nil,
@@ -81,7 +81,7 @@ func (vr *ViewResultProvider) NotAuthorized() ControllerResult {
 }
 
 // View returns a view result.
-func (vr *ViewResultProvider) View(viewName string, viewModel interface{}) ControllerResult {
+func (vr *ViewResultProvider) View(viewName string, viewModel interface{}) Result {
 	return &ViewResult{
 		StatusCode: http.StatusOK,
 		ViewModel:  viewModel,
@@ -91,6 +91,6 @@ func (vr *ViewResultProvider) View(viewName string, viewModel interface{}) Contr
 }
 
 // Result doesnt return a view result.
-func (vr *ViewResultProvider) Result(response interface{}) ControllerResult {
+func (vr *ViewResultProvider) Result(response interface{}) Result {
 	panic("ViewResultProvider.Result is not implemented")
 }

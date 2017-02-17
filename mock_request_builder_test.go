@@ -30,7 +30,7 @@ func TestMockRequestBuilderWithQueryString(t *testing.T) {
 func TestMockRequestBuilderFetchResponseAsBytes(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
-	app.GET("/test_path", func(r *RequestContext) ControllerResult {
+	app.GET("/test_path", func(r *Ctx) Result {
 		return r.Raw([]byte("test"))
 	})
 	resBody, err := app.Mock().WithPathf("/test_path").FetchResponseAsBytes()
@@ -42,7 +42,7 @@ func TestMockRequestBuilderFetchResponseAsBytes(t *testing.T) {
 func TestMockRequestBuilderFetchResponseAsJSON(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
-	app.GET("/test_path", func(r *RequestContext) ControllerResult {
+	app.GET("/test_path", func(r *Ctx) Result {
 		return r.RawJSON([]string{"foo", "bar"})
 	})
 	var res []string

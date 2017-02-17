@@ -8,18 +8,18 @@ import (
 )
 
 // NewJSONResultProvider Creates a new JSONResults object.
-func NewJSONResultProvider(diag *logger.DiagnosticsAgent, r *RequestContext) *JSONResultProvider {
-	return &JSONResultProvider{diagnostics: diag, requestContext: r}
+func NewJSONResultProvider(diag *logger.DiagnosticsAgent, r *Ctx) *JSONResultProvider {
+	return &JSONResultProvider{diagnostics: diag, ctx: r}
 }
 
 // JSONResultProvider are context results for api methods.
 type JSONResultProvider struct {
-	diagnostics    *logger.DiagnosticsAgent
-	requestContext *RequestContext
+	diagnostics *logger.DiagnosticsAgent
+	ctx         *Ctx
 }
 
 // NotFound returns a service response.
-func (jrp *JSONResultProvider) NotFound() ControllerResult {
+func (jrp *JSONResultProvider) NotFound() Result {
 	return &JSONResult{
 		StatusCode: http.StatusNotFound,
 		Response:   "Not Found",
@@ -27,7 +27,7 @@ func (jrp *JSONResultProvider) NotFound() ControllerResult {
 }
 
 // NotAuthorized returns a service response.
-func (jrp *JSONResultProvider) NotAuthorized() ControllerResult {
+func (jrp *JSONResultProvider) NotAuthorized() Result {
 	return &JSONResult{
 		StatusCode: http.StatusForbidden,
 		Response:   "Not Authorized",
@@ -35,10 +35,10 @@ func (jrp *JSONResultProvider) NotAuthorized() ControllerResult {
 }
 
 // InternalError returns a service response.
-func (jrp *JSONResultProvider) InternalError(err error) ControllerResult {
+func (jrp *JSONResultProvider) InternalError(err error) Result {
 	if jrp.diagnostics != nil {
-		if jrp.requestContext != nil {
-			jrp.diagnostics.FatalWithReq(err, jrp.requestContext.Request)
+		if jrp.ctx != nil {
+			jrp.diagnostics.FatalWithReq(err, jrp.ctx.Request)
 		} else {
 			jrp.diagnostics.FatalWithReq(err, nil)
 		}
@@ -58,7 +58,7 @@ func (jrp *JSONResultProvider) InternalError(err error) ControllerResult {
 }
 
 // BadRequest returns a service response.
-func (jrp *JSONResultProvider) BadRequest(message string) ControllerResult {
+func (jrp *JSONResultProvider) BadRequest(message string) Result {
 	return &JSONResult{
 		StatusCode: http.StatusBadRequest,
 		Response:   message,
@@ -66,7 +66,7 @@ func (jrp *JSONResultProvider) BadRequest(message string) ControllerResult {
 }
 
 // OK returns a service response.
-func (jrp *JSONResultProvider) OK() ControllerResult {
+func (jrp *JSONResultProvider) OK() Result {
 	return &JSONResult{
 		StatusCode: http.StatusOK,
 		Response:   "OK!",
@@ -74,7 +74,7 @@ func (jrp *JSONResultProvider) OK() ControllerResult {
 }
 
 // Result returns a json response.
-func (jrp *JSONResultProvider) Result(response interface{}) ControllerResult {
+func (jrp *JSONResultProvider) Result(response interface{}) Result {
 	return &JSONResult{
 		StatusCode: http.StatusOK,
 		Response:   response,

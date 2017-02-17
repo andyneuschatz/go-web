@@ -64,9 +64,9 @@ type App struct {
 	staticRewriteRules map[string][]*RewriteRule
 	staticHeaders      map[string]http.Header
 
-	panicHandler PanicControllerAction
+	panicHandler PanicAction
 
-	defaultResultProvider ControllerMiddleware
+	defaultResultProvider Middleware
 
 	viewCache *ViewCache
 
@@ -179,7 +179,7 @@ func (a *App) onRequestStart(writer logger.Logger, ts logger.TimeSource, eventFl
 	if len(state) < 1 {
 		return
 	}
-	context, isContext := state[0].(*RequestContext)
+	context, isContext := state[0].(*Ctx)
 	if !isContext {
 		return
 	}
@@ -203,7 +203,7 @@ func (a *App) onRequestComplete(writer logger.Logger, ts logger.TimeSource, even
 	if len(state) < 1 {
 		return
 	}
-	context, isContext := state[0].(*RequestContext)
+	context, isContext := state[0].(*Ctx)
 	if !isContext {
 		return
 	}
@@ -251,12 +251,12 @@ func (a *App) SetPort(port string) {
 }
 
 // SetDefaultResultProvider sets the application wide default result provider.
-func (a *App) SetDefaultResultProvider(resultProvider ControllerMiddleware) {
+func (a *App) SetDefaultResultProvider(resultProvider Middleware) {
 	a.defaultResultProvider = resultProvider
 }
 
 // DefaultResultProvider returns the default result provider.
-func (a *App) DefaultResultProvider() ControllerMiddleware {
+func (a *App) DefaultResultProvider() Middleware {
 	if a.defaultResultProvider == nil {
 		return APIProviderAsDefault
 	}
@@ -344,37 +344,37 @@ func (a *App) Register(c Controller) {
 }
 
 // GET registers a GET request handler.
-func (a *App) GET(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) GET(path string, action Action, middleware ...Middleware) {
 	a.router.GET(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // OPTIONS registers a OPTIONS request handler.
-func (a *App) OPTIONS(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) OPTIONS(path string, action Action, middleware ...Middleware) {
 	a.router.OPTIONS(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // HEAD registers a HEAD request handler.
-func (a *App) HEAD(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) HEAD(path string, action Action, middleware ...Middleware) {
 	a.router.HEAD(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // PUT registers a PUT request handler.
-func (a *App) PUT(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) PUT(path string, action Action, middleware ...Middleware) {
 	a.router.PUT(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // PATCH registers a PATCH request handler.
-func (a *App) PATCH(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) PATCH(path string, action Action, middleware ...Middleware) {
 	a.router.PATCH(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // POST registers a POST request actions.
-func (a *App) POST(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) POST(path string, action Action, middleware ...Middleware) {
 	a.router.POST(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
 // DELETE registers a DELETE request handler.
-func (a *App) DELETE(path string, action ControllerAction, middleware ...ControllerMiddleware) {
+func (a *App) DELETE(path string, action Action, middleware ...Middleware) {
 	a.router.DELETE(path, a.renderAction(NestMiddleware(action, middleware...)))
 }
 
@@ -424,11 +424,11 @@ func (a *App) Static(path string, root http.FileSystem) {
 	a.router.GET(path, a.renderAction(a.staticAction(path, root)))
 }
 
-// staticAction returns a ControllerAction for a given static path and root.
-func (a *App) staticAction(path string, root http.FileSystem) ControllerAction {
+// staticAction returns a Action for a given static path and root.
+func (a *App) staticAction(path string, root http.FileSystem) Action {
 	fileServer := http.FileServer(root)
 
-	return func(r *RequestContext) ControllerResult {
+	return func(ctx *Ctx) Result {
 
 		var staticRewriteRules []*RewriteRule
 		var staticHeaders http.Header
@@ -441,7 +441,7 @@ func (a *App) staticAction(path string, root http.FileSystem) ControllerAction {
 			staticHeaders = headers
 		}
 
-		filePath, _ := r.RouteParam("filepath")
+		filePath, _ := ctx.RouteParam("filepath")
 
 		return &StaticResult{
 			FilePath:     filePath,
@@ -462,22 +462,22 @@ func (a *App) View() *ViewCache {
 // --------------------------------------------------------------------------------
 
 // SetNotFoundHandler sets the not found handler.
-func (a *App) SetNotFoundHandler(handler ControllerAction) {
+func (a *App) SetNotFoundHandler(handler Action) {
 	a.router.NotFound = newHandleShim(a, handler)
 }
 
 // SetMethodNotAllowedHandler sets the not found handler.
-func (a *App) SetMethodNotAllowedHandler(handler ControllerAction) {
+func (a *App) SetMethodNotAllowedHandler(handler Action) {
 	a.router.MethodNotAllowed = newHandleShim(a, handler)
 }
 
 // SetPanicHandler sets the not found handler.
-func (a *App) SetPanicHandler(handler PanicControllerAction) {
+func (a *App) SetPanicHandler(handler PanicAction) {
 	a.panicHandler = handler
 	a.router.PanicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
-		a.renderAction(func(r *RequestContext) ControllerResult {
-			a.diagnostics.FatalWithReq(fmt.Errorf("%v", err), r.Request)
-			return handler(r, err)
+		a.renderAction(func(ctx *Ctx) Result {
+			a.diagnostics.FatalWithReq(fmt.Errorf("%v", err), ctx.Request)
+			return handler(ctx, err)
 		})(w, r, httprouter.Params{})
 	}
 }
@@ -499,9 +499,9 @@ func (a *App) Mock() *MockRequestBuilder {
 // Request Pipeline
 // --------------------------------------------------------------------------------
 
-// renderAction is the translation step from ControllerAction to httprouter.Handle.
+// renderAction is the translation step from Action to httprouter.Handle.
 // this is where the bulk of the "pipeline" happens.
-func (a *App) renderAction(action ControllerAction) httprouter.Handle {
+func (a *App) renderAction(action Action) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		a.setCommonResponseHeaders(w)
 		response := a.newResponse(w, r)
@@ -542,18 +542,18 @@ func (a *App) shouldCompressOutput(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")
 }
 
-func (a *App) pipelineInit(w ResponseWriter, r *http.Request, p RouteParameters) *RequestContext {
-	context := a.requestContext(w, r, p)
+func (a *App) pipelineInit(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
+	context := a.newCtx(w, r, p)
 	context.onRequestStart()
 	a.diagnostics.OnEvent(logger.EventWebRequestStart, context)
 	return context
 }
 
-var controllerNoOp = func(_ *RequestContext) ControllerResult { return nil }
+var controllerNoOp = func(_ *Ctx) Result { return nil }
 
-// RequestContext creates an http context.
-func (a *App) requestContext(w ResponseWriter, r *http.Request, p RouteParameters) *RequestContext {
-	rc := NewRequestContext(w, r, p)
+// Ctx creates a context.
+func (a *App) newCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
+	rc := NewCtx(w, r, p)
 	rc.app = a
 	rc.auth = a.auth
 	rc.tx = a.tx
@@ -572,7 +572,7 @@ func (a *App) requestContext(w ResponseWriter, r *http.Request, p RouteParameter
 	return rc
 }
 
-func (a *App) renderResult(action ControllerAction, context *RequestContext) error {
+func (a *App) renderResult(action Action, context *Ctx) error {
 	result := action(context)
 	if result != nil {
 		err := result.Render(context)
@@ -584,7 +584,7 @@ func (a *App) renderResult(action ControllerAction, context *RequestContext) err
 	return nil
 }
 
-func (a *App) pipelineComplete(context *RequestContext) {
+func (a *App) pipelineComplete(context *Ctx) {
 	err := context.Response.Flush()
 	if err != nil && err != http.ErrBodyNotAllowed {
 		a.diagnostics.Error(err)

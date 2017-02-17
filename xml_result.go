@@ -7,6 +7,6 @@ type XMLResult struct {
 }
 
 // Render renders the result
-func (ar *XMLResult) Render(rc *RequestContext) error {
-	return WriteXML(rc.Response, rc.Request, ar.StatusCode, ar.Response)
+func (ar *XMLResult) Render(ctx *Ctx) error {
+	return WriteXML(ctx.Response, ctx.Request, ar.StatusCode, ar.Response)
 }

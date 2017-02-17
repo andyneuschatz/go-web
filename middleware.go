@@ -1,32 +1,32 @@
 package web
 
 // APIProviderAsDefault sets the context.CurrrentProvider() equal to context.API().
-func APIProviderAsDefault(action ControllerAction) ControllerAction {
-	return func(context *RequestContext) ControllerResult {
+func APIProviderAsDefault(action Action) Action {
+	return func(context *Ctx) Result {
 		context.SetDefaultResultProvider(context.API())
 		return action(context)
 	}
 }
 
 // ViewProviderAsDefault sets the context.CurrrentProvider() equal to context.View().
-func ViewProviderAsDefault(action ControllerAction) ControllerAction {
-	return func(context *RequestContext) ControllerResult {
+func ViewProviderAsDefault(action Action) Action {
+	return func(context *Ctx) Result {
 		context.SetDefaultResultProvider(context.View())
 		return action(context)
 	}
 }
 
 // JSONProviderAsDefault sets the context.CurrrentProvider() equal to context.API().
-func JSONProviderAsDefault(action ControllerAction) ControllerAction {
-	return func(context *RequestContext) ControllerResult {
+func JSONProviderAsDefault(action Action) Action {
+	return func(context *Ctx) Result {
 		context.SetDefaultResultProvider(context.JSON())
 		return action(context)
 	}
 }
 
 // XMLProviderAsDefault sets the context.CurrrentProvider() equal to context.API().
-func XMLProviderAsDefault(action ControllerAction) ControllerAction {
-	return func(context *RequestContext) ControllerResult {
+func XMLProviderAsDefault(action Action) Action {
+	return func(context *Ctx) Result {
 		context.SetDefaultResultProvider(context.XML())
 		return action(context)
 	}

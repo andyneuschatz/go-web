@@ -61,7 +61,7 @@ func TestViewResultProviderInternalErrorWritesToLogger(t *testing.T) {
 		wr.Errorf("%v", state[0])
 	})
 
-	rc, err := app.Mock().RequestContext(nil)
+	rc, err := app.Mock().Ctx(nil)
 	assert.Nil(err)
 
 	result := NewViewResultProvider(app.Diagnostics(), NewViewCache(), rc).InternalError(exception.New("Test"))

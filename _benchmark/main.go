@@ -42,17 +42,17 @@ func port() string {
 	return "8080"
 }
 
-func jsonHandler(r *web.RequestContext) web.ControllerResult {
+func jsonHandler(ctx *web.Ctx) web.Result {
 	time.Sleep(1000 * time.Millisecond)
-	r.Response.Header().Set(HeaderContentType, ContentTypeJSON)
-	r.Response.Header().Set(HeaderServer, ServerName)
-	json.NewEncoder(r.Response).Encode(&message{Message: MessageText})
+	ctx.Response.Header().Set(HeaderContentType, ContentTypeJSON)
+	ctx.Response.Header().Set(HeaderServer, ServerName)
+	json.NewEncoder(ctx.Response).Encode(&message{Message: MessageText})
 	return nil
 }
 
-func jsonResultHandler(r *web.RequestContext) web.ControllerResult {
+func jsonResultHandler(ctx *web.Ctx) web.Result {
 	time.Sleep(1000 * time.Millisecond)
-	return r.JSON(&message{Message: MessageText})
+	return ctx.JSON().Result(&message{Message: MessageText})
 }
 
 func main() {
