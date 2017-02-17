@@ -506,6 +506,9 @@ func (rc *Ctx) WriteNewCookie(name string, value string, expires *time.Time, pat
 // ExtendCookieByDuration extends a cookie by a time duration (on the order of nanoseconds to hours).
 func (rc *Ctx) ExtendCookieByDuration(name string, path string, duration time.Duration) {
 	c := rc.GetCookie(name)
+	if c == nil {
+		return
+	}
 	c.Path = path
 	c.Domain = rc.getCookieDomain()
 	c.Expires = c.Expires.Add(duration)
@@ -515,6 +518,9 @@ func (rc *Ctx) ExtendCookieByDuration(name string, path string, duration time.Du
 // ExtendCookie extends a cookie by years, months or days.
 func (rc *Ctx) ExtendCookie(name string, path string, years, months, days int) {
 	c := rc.GetCookie(name)
+	if c == nil {
+		return
+	}
 	c.Path = path
 	c.Domain = rc.getCookieDomain()
 	c.Expires.AddDate(years, months, days)
@@ -524,6 +530,9 @@ func (rc *Ctx) ExtendCookie(name string, path string, years, months, days int) {
 // ExpireCookie expires a cookie.
 func (rc *Ctx) ExpireCookie(name string, path string) {
 	c := rc.GetCookie(name)
+	if c == nil {
+		return
+	}
 	c.Path = path
 	c.Value = NewSessionID()
 	c.Domain = rc.getCookieDomain()
