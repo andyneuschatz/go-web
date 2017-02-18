@@ -165,7 +165,15 @@ func (sm *AuthManager) Logout(userID int64, sessionID string, context *Ctx) erro
 
 // ReadSessionID reads a session id from a given request context.
 func (sm *AuthManager) ReadSessionID(context *Ctx) string {
-	return context.Param(sm.sessionParamName)
+	if headerValue, err := context.HeaderParam(sm.SessionParamName()); err == nil {
+		return headerValue
+	}
+
+	if cookie := context.GetCookie(sm.SessionParamName()); cookie != nil {
+		return cookie.Value
+	}
+
+	return ""
 }
 
 // VerifySession checks a sessionID to see if it's valid.
