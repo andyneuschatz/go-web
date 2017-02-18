@@ -7,13 +7,13 @@ import (
 	assert "github.com/blendlabs/go-assert"
 )
 
-func TestSessionManagerLogin(t *testing.T) {
+func TestAuthManagerLogin(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
 	rc, _ := app.Mock().Ctx(nil)
 
-	sm := NewSessionManager()
+	sm := NewAuthManager()
 	session, err := sm.Login(1, rc)
 	assert.Nil(err)
 
@@ -23,7 +23,7 @@ func TestSessionManagerLogin(t *testing.T) {
 	assert.Equal(1, valid.UserID)
 }
 
-func TestSessionManagerLoginWithPersist(t *testing.T) {
+func TestAuthManagerLoginWithPersist(t *testing.T) {
 	assert := assert.New(t)
 
 	sessions := map[string]*Session{}
@@ -32,7 +32,7 @@ func TestSessionManagerLoginWithPersist(t *testing.T) {
 	rc, _ := app.Mock().Ctx(nil)
 
 	didCallPersist := false
-	sm := NewSessionManager()
+	sm := NewAuthManager()
 	sm.SetPersistHandler(func(c *Ctx, s *Session, tx *sql.Tx) error {
 		didCallPersist = true
 		sessions[s.SessionID] = s
@@ -43,7 +43,7 @@ func TestSessionManagerLoginWithPersist(t *testing.T) {
 	assert.Nil(err)
 	assert.True(didCallPersist)
 
-	sm2 := NewSessionManager()
+	sm2 := NewAuthManager()
 	sm2.SetFetchHandler(func(sid string, tx *sql.Tx) (*Session, error) {
 		return sessions[sid], nil
 	})
@@ -54,10 +54,10 @@ func TestSessionManagerLoginWithPersist(t *testing.T) {
 	assert.Equal(1, valid.UserID)
 }
 
-func TestSessionManagerVerifySession(t *testing.T) {
+func TestAuthManagerVerifySession(t *testing.T) {
 	assert := assert.New(t)
 
-	sm := NewSessionManager()
+	sm := NewAuthManager()
 	sessionID := NewSessionID()
 	sm.sessionCache.Add(NewSession(1, sessionID))
 
@@ -71,14 +71,14 @@ func TestSessionManagerVerifySession(t *testing.T) {
 	assert.Nil(invalid)
 }
 
-func TestSessionManagerVerifySessionWithFetch(t *testing.T) {
+func TestAuthManagerVerifySessionWithFetch(t *testing.T) {
 	assert := assert.New(t)
 
 	sessions := map[string]*Session{}
 
 	didCallHandler := false
 
-	sm := NewSessionManager()
+	sm := NewAuthManager()
 	sm.SetFetchHandler(func(sessionID string, tx *sql.Tx) (*Session, error) {
 		didCallHandler = true
 		return sessions[sessionID], nil
@@ -97,9 +97,9 @@ func TestSessionManagerVerifySessionWithFetch(t *testing.T) {
 	assert.Nil(invalid)
 }
 
-func TestSessionManagerIsCookieSecure(t *testing.T) {
+func TestAuthManagerIsCookieSecure(t *testing.T) {
 	assert := assert.New(t)
-	sm := NewSessionManager()
+	sm := NewAuthManager()
 	assert.False(sm.IsCookieSecure())
 	sm.SetCookieAsSecure(true)
 	assert.True(sm.IsCookieSecure())

@@ -37,7 +37,7 @@ func New() *App {
 		staticRewriteRules: map[string][]*RewriteRule{},
 		staticHeaders:      map[string]http.Header{},
 		tlsCertLock:        &sync.Mutex{},
-		auth:               NewSessionManager(),
+		auth:               NewAuthManager(),
 		viewCache:          NewViewCache(),
 		diagnostics:        logger.NewDiagnosticsAgent(logger.NewEventFlagSetNone()),
 	}
@@ -70,7 +70,7 @@ type App struct {
 
 	viewCache *ViewCache
 
-	auth *SessionManager
+	auth *AuthManager
 
 	tx *sql.Tx
 }
@@ -156,12 +156,12 @@ func (a *App) SetConfig(config interface{}) {
 }
 
 // Auth returns the session manager.
-func (a *App) Auth() *SessionManager {
+func (a *App) Auth() *AuthManager {
 	return a.auth
 }
 
 // SetAuth sets the session manager.
-func (a *App) SetAuth(auth *SessionManager) {
+func (a *App) SetAuth(auth *AuthManager) {
 	a.auth = auth
 }
 

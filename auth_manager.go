@@ -30,17 +30,17 @@ func NewSessionID() string {
 	return String.SecureRandom(64)
 }
 
-// NewSessionManager returns a new session manager.
-func NewSessionManager() *SessionManager {
-	return &SessionManager{
+// NewAuthManager returns a new session manager.
+func NewAuthManager() *AuthManager {
+	return &AuthManager{
 		sessionCache:                NewSessionCache(),
 		sessionCookieIsSessionBound: true,
 		sessionParamName:            DefaultSessionParamName,
 	}
 }
 
-// SessionManager is a manager for sessions.
-type SessionManager struct {
+// AuthManager is a manager for sessions.
+type AuthManager struct {
 	sessionCache         *SessionCache
 	persistHandler       func(*Ctx, *Session, *sql.Tx) error
 	fetchHandler         func(sessionID string, tx *sql.Tx) (*Session, error)
@@ -55,66 +55,66 @@ type SessionManager struct {
 }
 
 // SetCookiesAsSessionBound sets the session issued cookies to be deleted after the browser closes.
-func (sm *SessionManager) SetCookiesAsSessionBound() {
+func (sm *AuthManager) SetCookiesAsSessionBound() {
 	sm.sessionCookieIsSessionBound = true
 	sm.sessionCookieTimeoutProvider = nil
 }
 
 // SetCookieTimeout sets the cookies to the given timeout.
-func (sm *SessionManager) SetCookieTimeout(timeoutProvider func(rc *Ctx) *time.Time) {
+func (sm *AuthManager) SetCookieTimeout(timeoutProvider func(rc *Ctx) *time.Time) {
 	sm.sessionCookieIsSessionBound = false
 	sm.sessionCookieTimeoutProvider = timeoutProvider
 }
 
 // SetCookieAsSecure overrides defaults when determining if we should use the HTTPS only cooikie option.
 // The default depends on the app configuration (if tls is configured and enabled).
-func (sm *SessionManager) SetCookieAsSecure(isSecure bool) {
+func (sm *AuthManager) SetCookieAsSecure(isSecure bool) {
 	sm.sessionCookieIsSecure = &isSecure
 }
 
 // SessionParamName returns the session param name.
-func (sm *SessionManager) SessionParamName() string {
+func (sm *AuthManager) SessionParamName() string {
 	return sm.sessionParamName
 }
 
 // SetSessionParamName sets the session param name.
-func (sm *SessionManager) SetSessionParamName(paramName string) {
+func (sm *AuthManager) SetSessionParamName(paramName string) {
 	sm.sessionParamName = paramName
 }
 
 // SetPersistHandler sets the persist handler
-func (sm *SessionManager) SetPersistHandler(handler func(*Ctx, *Session, *sql.Tx) error) {
+func (sm *AuthManager) SetPersistHandler(handler func(*Ctx, *Session, *sql.Tx) error) {
 	sm.persistHandler = handler
 }
 
 // SetFetchHandler sets the fetch handler
-func (sm *SessionManager) SetFetchHandler(handler func(sessionID string, tx *sql.Tx) (*Session, error)) {
+func (sm *AuthManager) SetFetchHandler(handler func(sessionID string, tx *sql.Tx) (*Session, error)) {
 	sm.fetchHandler = handler
 }
 
 // SetRemoveHandler sets the remove handler.
-func (sm *SessionManager) SetRemoveHandler(handler func(sessionID string, tx *sql.Tx) error) {
+func (sm *AuthManager) SetRemoveHandler(handler func(sessionID string, tx *sql.Tx) error) {
 	sm.removeHandler = handler
 }
 
 // SetValidateHandler sets the validate handler.
-func (sm *SessionManager) SetValidateHandler(handler func(*Session, *sql.Tx) error) {
+func (sm *AuthManager) SetValidateHandler(handler func(*Session, *sql.Tx) error) {
 	sm.validateHandler = handler
 }
 
 // SetLoginRedirectHandler sets the handler to determin where to redirect on not authorized attempts.
 // It should return (nil) if you want to just show the `not_authorized` template.
-func (sm *SessionManager) SetLoginRedirectHandler(handler func(*url.URL) *url.URL) {
+func (sm *AuthManager) SetLoginRedirectHandler(handler func(*url.URL) *url.URL) {
 	sm.loginRedirectHandler = handler
 }
 
 // SessionCache returns the session cache.
-func (sm SessionManager) SessionCache() *SessionCache {
+func (sm AuthManager) SessionCache() *SessionCache {
 	return sm.sessionCache
 }
 
 // Login logs a userID in.
-func (sm *SessionManager) Login(userID int64, context *Ctx) (*Session, error) {
+func (sm *AuthManager) Login(userID int64, context *Ctx) (*Session, error) {
 	sessionID := NewSessionID()
 	session := NewSession(userID, sessionID)
 
@@ -132,7 +132,7 @@ func (sm *SessionManager) Login(userID int64, context *Ctx) (*Session, error) {
 }
 
 // InjectSessionCookie injects a session cookie into the context.
-func (sm *SessionManager) InjectSessionCookie(context *Ctx, sessionID string) {
+func (sm *AuthManager) InjectSessionCookie(context *Ctx, sessionID string) {
 	if context != nil {
 		if sm.sessionCookieIsSessionBound {
 			context.WriteNewCookie(sm.sessionParamName, sessionID, nil, DefaultSessionCookiePath, sm.IsCookieSecure())
@@ -143,12 +143,12 @@ func (sm *SessionManager) InjectSessionCookie(context *Ctx, sessionID string) {
 }
 
 // IsCookieSecure returns if the session cookie is configured to be secure only.
-func (sm *SessionManager) IsCookieSecure() bool {
+func (sm *AuthManager) IsCookieSecure() bool {
 	return sm.sessionCookieIsSecure != nil && *sm.sessionCookieIsSecure
 }
 
 // Logout un-authenticates a session.
-func (sm *SessionManager) Logout(userID int64, sessionID string, context *Ctx) error {
+func (sm *AuthManager) Logout(userID int64, sessionID string, context *Ctx) error {
 	sm.sessionCache.Expire(sessionID)
 
 	if context != nil {
@@ -164,12 +164,12 @@ func (sm *SessionManager) Logout(userID int64, sessionID string, context *Ctx) e
 }
 
 // ReadSessionID reads a session id from a given request context.
-func (sm *SessionManager) ReadSessionID(context *Ctx) string {
+func (sm *AuthManager) ReadSessionID(context *Ctx) string {
 	return context.Param(sm.sessionParamName)
 }
 
 // VerifySession checks a sessionID to see if it's valid.
-func (sm *SessionManager) VerifySession(sessionID string, context *Ctx) (*Session, error) {
+func (sm *AuthManager) VerifySession(sessionID string, context *Ctx) (*Session, error) {
 	if sm.sessionCache.IsActive(sessionID) {
 		return sm.sessionCache.Get(sessionID), nil
 	}
@@ -204,7 +204,7 @@ func (sm *SessionManager) VerifySession(sessionID string, context *Ctx) (*Sessio
 
 // ReadAndVerifySession reads a session off a context and verifies it.
 // Note this will also inject the session into the context.
-func (sm *SessionManager) ReadAndVerifySession(context *Ctx) (*Session, error) {
+func (sm *AuthManager) ReadAndVerifySession(context *Ctx) (*Session, error) {
 	sessionID := sm.ReadSessionID(context)
 	if len(sessionID) > 0 {
 		session, err := sm.VerifySession(sessionID, context)
@@ -220,7 +220,7 @@ func (sm *SessionManager) ReadAndVerifySession(context *Ctx) (*Session, error) {
 
 // Redirect returns a redirect result for when auth fails and you need to
 // send the user to a login page.
-func (sm *SessionManager) Redirect(context *Ctx) Result {
+func (sm *AuthManager) Redirect(context *Ctx) Result {
 	if sm.loginRedirectHandler != nil {
 		redirectTo := context.auth.loginRedirectHandler(context.Request.URL)
 		if redirectTo != nil {

@@ -68,7 +68,7 @@ type Ctx struct {
 	app                   *App
 	diagnostics           *logger.DiagnosticsAgent
 	config                interface{}
-	auth                  *SessionManager
+	auth                  *AuthManager
 	tx                    *sql.Tx
 	state                 State
 	routeParameters       RouteParameters
@@ -91,14 +91,14 @@ func (rc *Ctx) Tx() *sql.Tx {
 	return rc.tx
 }
 
-// Auth returns the SessionManager for the request.
-func (rc *Ctx) Auth() *SessionManager {
+// Auth returns the AuthManager for the request.
+func (rc *Ctx) Auth() *AuthManager {
 	return rc.auth
 }
 
 // SetAuth sets the request context auth.
-func (rc *Ctx) SetAuth(sessionManager *SessionManager) {
-	rc.auth = sessionManager
+func (rc *Ctx) SetAuth(authManager *AuthManager) {
+	rc.auth = authManager
 }
 
 // Session returns the session (if any) on the request.
