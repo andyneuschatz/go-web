@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/blendlabs/go-exception"
@@ -60,7 +61,7 @@ func (ar *APIResultProvider) InternalError(err error) Result {
 			Response: &APIResponse{
 				Meta: &APIResponseMeta{
 					StatusCode: http.StatusInternalServerError,
-					Message:    exPtr.Message(),
+					Message:    fmt.Sprintf("%v", exPtr),
 					Exception:  exPtr,
 				},
 			},
