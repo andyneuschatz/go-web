@@ -12,7 +12,7 @@ Let's say we have a controller we need to implement:
 ```go
 type FooController struct {}
 
-func (fc FooController) barHandler(ctx *web.RequestContext) web.ControllerResult {
+func (fc FooController) barHandler(ctx *web.Ctx) web.ControllerResult {
 	return ctx.Raw([]byte("bar!"))
 }
 
@@ -50,7 +50,7 @@ What do `middle1` and `middle2` look like? They are `ControllerMiddleware` and a
 
 ```go
 func middle1(action web.ControllerAction) web.ControllerAction {
-	return func(r *web.RequestContext) web.ControllerResult {
+	return func(r *web.Ctx) web.ControllerResult {
 		if r.Param("foo") != "bar" { //maximum security
 			return r.DefaultResultProvider().NotAuthorized() //.DefaultResultProvider() is set by `web.ViewProviderAsDefault()`
 		}
@@ -77,7 +77,7 @@ We then use the `http.Dir` function to specify the filesystem root that will be 
 You can also have a controller action return a static file:
 
 ```go
-	app.GET("/thing", func(r *web.RequestContext) web.ControllerResult { return r.Static("path/to/my/file") })
+	app.GET("/thing", func(r *web.Ctx) web.ControllerResult { return r.Static("path/to/my/file") })
 ```
 
 You can optionally set a static re-write rule (such as if you are cache-breaking assets with timestamps in the filename):
