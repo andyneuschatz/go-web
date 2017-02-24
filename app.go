@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"time"
+
 	exception "github.com/blendlabs/go-exception"
 	logger "github.com/blendlabs/go-logger"
 	"github.com/julienschmidt/httprouter"
@@ -273,8 +275,10 @@ func (a *App) OnStart(action AppStartDelegate) {
 func (a *App) Start() error {
 	bindAddr := fmt.Sprintf(":%s", a.Port())
 	server := &http.Server{
-		Addr:    bindAddr,
-		Handler: a,
+		Addr:        bindAddr,
+		Handler:     a,
+		ReadTimeout: 5 * time.Second,
+		// WriteTimeout intentionally omitted.
 	}
 
 	return a.StartWithServer(server)
