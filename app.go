@@ -300,10 +300,10 @@ func (a *App) OnStart(action AppStartDelegate) {
 func (a *App) Start() error {
 	bindAddr := fmt.Sprintf(":%s", a.Port())
 	server := &http.Server{
-		Addr:        bindAddr,
-		Handler:     a,
-		ReadTimeout: 5 * time.Second,
-		// WriteTimeout intentionally omitted.
+		Addr:         bindAddr,
+		Handler:      a,
+		ReadTimeout:  a.readTimeout,
+		WriteTimeout: a.writeTimeout,
 	}
 
 	return a.StartWithServer(server)
