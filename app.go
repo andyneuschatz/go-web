@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	exception "github.com/blendlabs/go-exception"
 	logger "github.com/blendlabs/go-logger"
@@ -39,6 +40,7 @@ func New() *App {
 		tlsCertLock:        &sync.Mutex{},
 		auth:               NewAuthManager(),
 		viewCache:          NewViewCache(),
+		readTimeout:        5 * time.Second,
 		diagnostics:        logger.NewDiagnosticsAgent(logger.NewEventFlagSetNone()),
 	}
 }
@@ -70,6 +72,9 @@ type App struct {
 
 	viewCache *ViewCache
 
+	readTimeout  time.Duration
+	writeTimeout time.Duration
+
 	auth *AuthManager
 
 	tx *sql.Tx
@@ -93,6 +98,26 @@ func (a *App) Domain() string {
 // SetDomain sets the domain for the app.
 func (a *App) SetDomain(domain string) {
 	a.domain = domain
+}
+
+// ReadTimeout returns the read timeout for the server.
+func (a *App) ReadTimeout() time.Duration {
+	return a.readTimeout
+}
+
+// SetReadTimeout sets the read timeout for the server.
+func (a *App) SetReadTimeout(readTimeout time.Duration) {
+	a.readTimeout = readTimeout
+}
+
+// WriteTimeout returns the write timeout for the server.
+func (a *App) WriteTimeout() time.Duration {
+	return a.writeTimeout
+}
+
+// SetWriteTimeout sets the write timeout for the server.
+func (a *App) SetWriteTimeout(writeTimeout time.Duration) {
+	a.writeTimeout = writeTimeout
 }
 
 // UseTLS sets the app to use TLS.
