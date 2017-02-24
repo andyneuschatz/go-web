@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"time"
-
 	exception "github.com/blendlabs/go-exception"
 	logger "github.com/blendlabs/go-logger"
 	"github.com/julienschmidt/httprouter"
