@@ -220,7 +220,7 @@ func TestAppDefaultResultProviderWithDefaultFromRoute(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
-	app.View().Templates().New(DefaultTemplateNotAuthorized).Parse("<html><body><h4>Not Authorized</h4></body></html>")
+	app.ViewCache().Templates().New(DefaultTemplateNotAuthorized).Parse("<html><body><h4>Not Authorized</h4></body></html>")
 	app.SetDefaultResultProvider(APIProviderAsDefault)
 	app.GET("/", controllerNoOp, SessionRequired, ViewProviderAsDefault)
 
@@ -234,7 +234,7 @@ func TestAppViewResult(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
-	app.View().AddPaths("testdata/test_file.html")
+	app.ViewCache().AddPaths("testdata/test_file.html")
 	app.GET("/", func(r *Ctx) Result {
 		return r.View().View("test", "foobarbaz")
 	})
