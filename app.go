@@ -53,9 +53,9 @@ type App struct {
 	domain string
 	port   string
 
-	diagnostics *logger.DiagnosticsAgent
-	config      interface{}
-	router      *httprouter.Router
+	logger *logger.Agent
+	config interface{}
+	router *httprouter.Router
 
 	tlsCertBytes, tlsKeyBytes []byte
 	tlsCertLock               *sync.Mutex
@@ -90,7 +90,7 @@ func (a *App) Name() string {
 // SetName sets a log label for the app.
 func (a *App) SetName(name string) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Writer().SetLabel(name)
+		a.logger.Writer().SetLabel(name)
 	}
 	a.name = name
 }
@@ -159,19 +159,19 @@ func (a *App) UseTLSFromEnvironment() error {
 	return nil
 }
 
-// Diagnostics returns the diagnostics agent for the app.
-func (a *App) Diagnostics() *logger.DiagnosticsAgent {
-	return a.diagnostics
+// Logger returns the diagnostics agent for the app.
+func (a *App) Logger() *logger.Agent {
+	return a.logger
 }
 
-// SetDiagnostics sets the diagnostics agent.
-func (a *App) SetDiagnostics(agent *logger.DiagnosticsAgent) {
-	a.diagnostics = agent
-	if a.diagnostics != nil {
-		a.diagnostics.AddEventListener(logger.EventWebRequestStart, a.onRequestStart)
-		a.diagnostics.AddEventListener(logger.EventWebRequestPostBody, a.onRequestPostBody)
-		a.diagnostics.AddEventListener(logger.EventWebRequest, a.onRequestComplete)
-		a.diagnostics.AddEventListener(logger.EventWebResponse, a.onResponse)
+// SetLogger sets the diagnostics agent.
+func (a *App) SetLogger(agent *logger.Agent) {
+	a.logger = agent
+	if a.logger != nil {
+		a.logger.AddEventListener(logger.EventWebRequestStart, a.onRequestStart)
+		a.logger.AddEventListener(logger.EventWebRequestPostBody, a.onRequestPostBody)
+		a.logger.AddEventListener(logger.EventWebRequest, a.onRequestComplete)
+		a.logger.AddEventListener(logger.EventWebResponse, a.onResponse)
 	}
 }
 
@@ -359,7 +359,7 @@ func (a *App) StartWithServer(server *http.Server) error {
 			serverProtocol = "HTTPS (TLS)"
 		}
 		a.infof("%s server started, listening on %s", serverProtocol, server.Addr)
-		a.infof("%s server diagnostics verbosity %s", serverProtocol, a.diagnostics.Events().String())
+		a.infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	}
 
 	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
@@ -525,55 +525,55 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 // --------------------------------------------------------------------------------
 
 func (a *App) isDiagnosticsEnabled() bool {
-	return a.diagnostics != nil
+	return a.logger != nil
 }
 
 func (a *App) isDiagnosticsEventEnabled(eventFlag logger.EventFlag) bool {
 	if !a.isDiagnosticsEnabled() {
 		return false
 	}
-	return a.diagnostics.IsEnabled(eventFlag)
+	return a.logger.IsEnabled(eventFlag)
 }
 
 func (a *App) infof(format string, args ...interface{}) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Infof(format, args...)
+		a.logger.Infof(format, args...)
 	}
 }
 
 func (a *App) errorf(format string, args ...interface{}) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Errorf(format, args...)
+		a.logger.Errorf(format, args...)
 	}
 }
 
 func (a *App) fatalF(format string, args ...interface{}) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Fatalf(format, args...)
+		a.logger.Fatalf(format, args...)
 	}
 }
 
 func (a *App) error(err error) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Error(err)
+		a.logger.Error(err)
 	}
 }
 
 func (a *App) fatal(err error) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.Fatal(err)
+		a.logger.Fatal(err)
 	}
 }
 
 func (a *App) fatalWithReq(err error, req *http.Request) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.FatalWithReq(err, req)
+		a.logger.FatalWithReq(err, req)
 	}
 }
 
 func (a *App) onEvent(eventFlag logger.EventFlag, state ...interface{}) {
 	if a.isDiagnosticsEnabled() {
-		a.diagnostics.OnEvent(eventFlag, state...)
+		a.logger.OnEvent(eventFlag, state...)
 	}
 }
 
@@ -646,7 +646,7 @@ func (a *App) newCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx 
 	ctx.app = a
 	ctx.auth = a.auth
 	ctx.tx = a.tx
-	ctx.diagnostics = a.diagnostics
+	ctx.logger = a.logger
 	ctx.config = a.config
 
 	if a.defaultResultProvider != nil {

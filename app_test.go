@@ -27,9 +27,9 @@ func TestAppSetDiagnostics(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
-	app.SetDiagnostics(logger.NewDiagnosticsAgent(logger.NewEventFlagSetAll()))
-	assert.NotNil(app.Diagnostics())
-	assert.True(app.Diagnostics().Events().IsAllEnabled())
+	app.SetLogger(logger.New(logger.NewEventFlagSetAll()))
+	assert.NotNil(app.Logger())
+	assert.True(app.Logger().Events().IsAllEnabled())
 }
 
 func TestAppInitializeConfig(t *testing.T) {
@@ -51,7 +51,7 @@ func TestAppCtx(t *testing.T) {
 	rc, err := app.Mock().WithResponseBuffer(response).Ctx(nil)
 	assert.Nil(err)
 	assert.NotNil(rc)
-	assert.Nil(rc.diagnostics)
+	assert.Nil(rc.logger)
 
 	result := rc.Raw([]byte("foo"))
 	assert.NotNil(result)

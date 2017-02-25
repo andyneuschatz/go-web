@@ -9,13 +9,13 @@ import (
 )
 
 // NewAPIResultProvider Creates a new JSONResults object.
-func NewAPIResultProvider(diag *logger.DiagnosticsAgent, ctx *Ctx) *APIResultProvider {
+func NewAPIResultProvider(diag *logger.Agent, ctx *Ctx) *APIResultProvider {
 	return &APIResultProvider{diagnostics: diag, ctx: ctx}
 }
 
 // APIResultProvider are context results for api methods.
 type APIResultProvider struct {
-	diagnostics *logger.DiagnosticsAgent
+	diagnostics *logger.Agent
 	ctx         *Ctx
 }
 

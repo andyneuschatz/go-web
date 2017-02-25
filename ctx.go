@@ -66,7 +66,7 @@ type Ctx struct {
 	text                  *TextResultProvider
 	defaultResultProvider ResultProvider
 	app                   *App
-	diagnostics           *logger.DiagnosticsAgent
+	logger                *logger.Agent
 	config                interface{}
 	auth                  *AuthManager
 	tx                    *sql.Tx
@@ -142,7 +142,7 @@ func (rc *Ctx) TxRollback(rollbacker func() error) error {
 // View returns the view result provider.
 func (rc *Ctx) View() *ViewResultProvider {
 	if rc.view == nil {
-		rc.view = NewViewResultProvider(rc.app.diagnostics, rc.app.viewCache, rc)
+		rc.view = NewViewResultProvider(rc.app.logger, rc.app.viewCache, rc)
 	}
 	return rc.view
 }
@@ -150,7 +150,7 @@ func (rc *Ctx) View() *ViewResultProvider {
 // API returns the view result provider.
 func (rc *Ctx) API() *APIResultProvider {
 	if rc.api == nil {
-		rc.api = NewAPIResultProvider(rc.app.diagnostics, rc)
+		rc.api = NewAPIResultProvider(rc.app.logger, rc)
 	}
 	return rc.api
 }
@@ -158,7 +158,7 @@ func (rc *Ctx) API() *APIResultProvider {
 // JSON returns the JSON result provider.
 func (rc *Ctx) JSON() *JSONResultProvider {
 	if rc.json == nil {
-		rc.json = NewJSONResultProvider(rc.diagnostics, rc)
+		rc.json = NewJSONResultProvider(rc.logger, rc)
 	}
 	return rc.json
 }
@@ -166,7 +166,7 @@ func (rc *Ctx) JSON() *JSONResultProvider {
 // XML returns the xml result provider.
 func (rc *Ctx) XML() *XMLResultProvider {
 	if rc.xml == nil {
-		rc.xml = NewXMLResultProvider(rc.app.diagnostics, rc)
+		rc.xml = NewXMLResultProvider(rc.app.logger, rc)
 	}
 	return rc.xml
 }
@@ -174,7 +174,7 @@ func (rc *Ctx) XML() *XMLResultProvider {
 // Text returns the text result provider.
 func (rc *Ctx) Text() *TextResultProvider {
 	if rc.text == nil {
-		rc.text = NewTextResultProvider(rc.app.diagnostics, rc)
+		rc.text = NewTextResultProvider(rc.app.logger, rc)
 	}
 	return rc.text
 }
@@ -184,7 +184,7 @@ func (rc *Ctx) Text() *TextResultProvider {
 // steps that set it for you.
 func (rc *Ctx) DefaultResultProvider() ResultProvider {
 	if rc.defaultResultProvider == nil {
-		rc.defaultResultProvider = NewTextResultProvider(rc.diagnostics, rc)
+		rc.defaultResultProvider = NewTextResultProvider(rc.logger, rc)
 	}
 	return rc.defaultResultProvider
 }
@@ -290,8 +290,8 @@ func (rc *Ctx) ParamBool(name string) (bool, error) {
 }
 
 func (rc *Ctx) onPostBody(bodyContents []byte) {
-	if rc.diagnostics != nil {
-		rc.diagnostics.OnEvent(logger.EventWebRequestPostBody, rc.postBody)
+	if rc.logger != nil {
+		rc.logger.OnEvent(logger.EventWebRequestPostBody, rc.postBody)
 	}
 }
 
@@ -564,9 +564,9 @@ func (rc *Ctx) ExpireCookie(name string, path string) {
 // Diagnostics
 // --------------------------------------------------------------------------------
 
-// Diagnostics returns the diagnostics agent.
-func (rc *Ctx) Diagnostics() *logger.DiagnosticsAgent {
-	return rc.diagnostics
+// Logger returns the diagnostics agent.
+func (rc *Ctx) Logger() *logger.Agent {
+	return rc.logger
 }
 
 // Config returns the app config.

@@ -49,8 +49,8 @@ func TestAPIResultProviderInternalErrorWritesToLogger(t *testing.T) {
 
 	buffer := bytes.NewBuffer([]byte{})
 	app := New()
-	app.SetDiagnostics(logger.NewDiagnosticsAgent(logger.NewEventFlagSetWithEvents(logger.EventFatalError), logger.NewLogWriter(buffer)))
-	app.diagnostics.AddEventListener(logger.EventFatalError, func(wr logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	app.SetLogger(logger.New(logger.NewEventFlagSetWithEvents(logger.EventFatalError), logger.NewLogWriter(buffer)))
+	app.Logger().AddEventListener(logger.EventFatalError, func(wr logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
 		defer wg.Done()
 		wr.Errorf("%v", state[0])
 		assert.Len(state, 2)

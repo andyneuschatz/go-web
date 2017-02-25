@@ -12,8 +12,8 @@ import (
 	"github.com/blendlabs/go-logger"
 )
 
-func agent() *logger.DiagnosticsAgent {
-	return logger.NewDiagnosticsAgent(logger.NewEventFlagSetNone())
+func agent() *logger.Agent {
+	return logger.New(logger.NewEventFlagSetNone())
 }
 
 func TestViewResultProviderNotFound(t *testing.T) {
@@ -54,8 +54,8 @@ func TestViewResultProviderInternalErrorWritesToLogger(t *testing.T) {
 
 	logBuffer := bytes.NewBuffer([]byte{})
 	app := New()
-	app.SetDiagnostics(logger.NewDiagnosticsAgent(logger.NewEventFlagSetWithEvents(logger.EventFatalError), logger.NewLogWriter(logBuffer)))
-	app.diagnostics.AddEventListener(logger.EventFatalError, func(wr logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	app.SetLogger(logger.New(logger.NewEventFlagSetWithEvents(logger.EventFatalError), logger.NewLogWriter(logBuffer)))
+	app.Logger().AddEventListener(logger.EventFatalError, func(wr logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
 		defer wg.Done()
 		assert.Len(state, 2)
 		wr.Errorf("%v", state[0])
@@ -64,7 +64,7 @@ func TestViewResultProviderInternalErrorWritesToLogger(t *testing.T) {
 	rc, err := app.Mock().Ctx(nil)
 	assert.Nil(err)
 
-	result := NewViewResultProvider(app.Diagnostics(), NewViewCache(), rc).InternalError(exception.New("Test"))
+	result := NewViewResultProvider(app.Logger(), NewViewCache(), rc).InternalError(exception.New("Test"))
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
