@@ -11,6 +11,7 @@ func NewViewCache() *ViewCache {
 	return &ViewCache{
 		viewFuncMap: viewUtils(),
 		viewCache:   template.New(""),
+		enabled:     true,
 	}
 }
 
@@ -19,6 +20,7 @@ func NewViewCacheWithTemplates(templates *template.Template) *ViewCache {
 	return &ViewCache{
 		viewFuncMap: viewUtils(),
 		viewCache:   templates,
+		enabled:     true,
 	}
 }
 
@@ -27,6 +29,17 @@ type ViewCache struct {
 	viewFuncMap template.FuncMap
 	viewPaths   []string
 	viewCache   *template.Template
+	enabled     bool
+}
+
+// SetEnabled sets the view cache to either cache views or re-parse every request.
+func (vc *ViewCache) SetEnabled(enabled bool) {
+	vc.enabled = enabled
+}
+
+// Enabled indicates if the cache is enabled, or if it re-parses views every request.
+func (vc *ViewCache) Enabled() bool {
+	return vc.enabled
 }
 
 // Initialize caches templates by path.

@@ -486,8 +486,8 @@ func (a *App) staticAction(path string, root http.FileSystem) Action {
 	}
 }
 
-// View returns the view result provider.
-func (a *App) View() *ViewCache {
+// ViewCache returns the view result provider.
+func (a *App) ViewCache() *ViewCache {
 	return a.viewCache
 }
 

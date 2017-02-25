@@ -29,7 +29,8 @@ func NewViewResultProvider(log *logger.Agent, vc *ViewCache, r *Ctx) *ViewResult
 type ViewResultProvider struct {
 	diagnostics *logger.Agent
 	ctx         *Ctx
-	viewCache   *ViewCache
+
+	viewCache *ViewCache
 }
 
 // BadRequest returns a view result.
