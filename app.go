@@ -72,8 +72,10 @@ type App struct {
 
 	viewCache *ViewCache
 
-	readTimeout  time.Duration
-	writeTimeout time.Duration
+	readTimeout       time.Duration
+	readHeaderTimeout time.Duration
+	writeTimeout      time.Duration
+	idleTimeout       time.Duration
 
 	auth *AuthManager
 
@@ -294,17 +296,22 @@ func (a *App) OnStart(action AppStartDelegate) {
 	a.startDelegate = action
 }
 
+// Server returns the basic http.Server for the app.
+func (a *App) Server() *http.Server {
+	bindAddr := fmt.Sprintf(":%s", a.Port())
+	return &http.Server{
+		Addr:              bindAddr,
+		Handler:           a,
+		ReadTimeout:       a.readTimeout,
+		ReadHeaderTimeout: a.readHeaderTimeout,
+		WriteTimeout:      a.writeTimeout,
+		IdleTimeout:       a.idleTimeout,
+	}
+}
+
 // Start starts the server and binds to the given address.
 func (a *App) Start() error {
-	bindAddr := fmt.Sprintf(":%s", a.Port())
-	server := &http.Server{
-		Addr:         bindAddr,
-		Handler:      a,
-		ReadTimeout:  a.readTimeout,
-		WriteTimeout: a.writeTimeout,
-	}
-
-	return a.StartWithServer(server)
+	return a.StartWithServer(a.Server())
 }
 
 func (a *App) getCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
@@ -342,10 +349,6 @@ func (a *App) StartWithServer(server *http.Server) error {
 		a.diagnostics.Errorf("Startup tasks error: %v", err)
 		return err
 	}
-
-	// this is the only property we will set of the server
-	// i.e. the server handler (which is this app)
-	server.Handler = a
 
 	serverProtocol := "HTTP"
 	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {

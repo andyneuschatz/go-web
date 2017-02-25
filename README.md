@@ -5,6 +5,10 @@ Go-Web
 
 Go Web is a lightweight framework for building web applications in go. It rolls together very tightly scoped middleware with API endpoint and view endpoint patterns. 
 
+##Requirements
+
+* go 1.8+
+
 ##Example
 
 Let's say we have a controller we need to implement:
@@ -12,12 +16,12 @@ Let's say we have a controller we need to implement:
 ```go
 type FooController struct {}
 
-func (fc FooController) barHandler(ctx *web.Ctx) web.ControllerResult {
-	return ctx.Raw([]byte("bar!"))
-}
-
 func (fc FooContoller) Register(app *web.App) {
 	app.GET("/bar", fc.bar)
+}
+
+func (fc FooController) barHandler(ctx *web.Ctx) web.Result {
+	return ctx.Text().Result("bar!")
 }
 ```
 
@@ -53,6 +57,7 @@ func middle1(action web.ControllerAction) web.ControllerAction {
 	return func(r *web.Ctx) web.ControllerResult {
 		if r.Param("foo") != "bar" { //maximum security
 			return r.DefaultResultProvider().NotAuthorized() //.DefaultResultProvider() is set by `web.ViewProviderAsDefault()`
+															 // but also means we could use API or Text or just JSON endpoints with this middleware.
 		}
 		return action(r) //note we call the input action here!
 	}
