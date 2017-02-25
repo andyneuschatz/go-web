@@ -594,7 +594,7 @@ func (a *App) Mock() *MockRequestBuilder {
 // this is where the bulk of the "pipeline" happens.
 func (a *App) renderAction(action Action) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		a.setCommonResponseHeaders(w)
+		a.setResponseHeaders(w)
 		response := a.newResponse(w, r)
 		context := a.pipelineInit(response, r, NewRouteParameters(p))
 		a.renderResult(action, context)
@@ -602,7 +602,7 @@ func (a *App) renderAction(action Action) httprouter.Handle {
 	}
 }
 
-func (a *App) setCommonResponseHeaders(w http.ResponseWriter) {
+func (a *App) setResponseHeaders(w http.ResponseWriter) {
 	w.Header().Set(HeaderServer, PackageName)
 	w.Header().Set(HeaderXServedBy, PackageName)
 }
