@@ -41,7 +41,6 @@ func New() *App {
 		auth:               NewAuthManager(),
 		viewCache:          NewViewCache(),
 		readTimeout:        5 * time.Second,
-		diagnostics:        logger.NewDiagnosticsAgent(logger.NewEventFlagSetNone()),
 	}
 }
 
@@ -50,6 +49,7 @@ type AppStartDelegate func(app *App) error
 
 // App is the server for the app.
 type App struct {
+	name   string
 	domain string
 	port   string
 
@@ -82,14 +82,17 @@ type App struct {
 	tx *sql.Tx
 }
 
-// AppName returns the app name.
-func (a *App) AppName() string {
-	return a.diagnostics.Writer().Label()
+// Name returns the app name.
+func (a *App) Name() string {
+	return a.name
 }
 
-// SetAppName sets a log label for the app.
-func (a *App) SetAppName(appName string) {
-	a.diagnostics.Writer().SetLabel(appName)
+// SetName sets a log label for the app.
+func (a *App) SetName(name string) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Writer().SetLabel(name)
+	}
+	a.name = name
 }
 
 // Domain returns the domain for the app.
@@ -162,8 +165,8 @@ func (a *App) Diagnostics() *logger.DiagnosticsAgent {
 }
 
 // SetDiagnostics sets the diagnostics agent.
-func (a *App) SetDiagnostics(da *logger.DiagnosticsAgent) {
-	a.diagnostics = da
+func (a *App) SetDiagnostics(agent *logger.DiagnosticsAgent) {
+	a.diagnostics = agent
 	if a.diagnostics != nil {
 		a.diagnostics.AddEventListener(logger.EventWebRequestStart, a.onRequestStart)
 		a.diagnostics.AddEventListener(logger.EventWebRequestPostBody, a.onRequestPostBody)
@@ -335,28 +338,29 @@ func (a *App) commonStartupTasks() error {
 func (a *App) StartWithServer(server *http.Server) error {
 	var err error
 	if a.startDelegate != nil {
-		a.diagnostics.Infof("Startup tasks starting")
+		a.infof("Startup tasks starting")
 		err = a.startDelegate(a)
 		if err != nil {
-			a.diagnostics.Errorf("Startup tasks error: %v", err)
+			a.errorf("Startup tasks error: %v", err)
 			return err
 		}
-		a.diagnostics.Infof("Startup tasks complete")
+		a.infof("Startup tasks complete")
 	}
 
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.diagnostics.Errorf("Startup tasks error: %v", err)
+		a.errorf("Startup tasks error: %v", err)
 		return err
 	}
 
-	serverProtocol := "HTTP"
-	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
-		serverProtocol = "HTTPS (TLS)"
+	if a.isDiagnosticsEnabled() {
+		serverProtocol := "HTTP"
+		if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
+			serverProtocol = "HTTPS (TLS)"
+		}
+		a.infof("%s server started, listening on %s", serverProtocol, server.Addr)
+		a.infof("%s server diagnostics verbosity %s", serverProtocol, a.diagnostics.Events().String())
 	}
-
-	a.diagnostics.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
-	a.diagnostics.Infof("%s server diagnostics verbosity %s", serverProtocol, a.diagnostics.Events().String())
 
 	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
 		server.TLSConfig = &tls.Config{
@@ -506,7 +510,7 @@ func (a *App) SetPanicHandler(handler PanicAction) {
 	a.panicHandler = handler
 	a.router.PanicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
 		a.renderAction(func(ctx *Ctx) Result {
-			a.diagnostics.FatalWithReq(fmt.Errorf("%v", err), ctx.Request)
+			a.fatalWithReq(fmt.Errorf("%v", err), ctx.Request)
 			return handler(ctx, err)
 		})(w, r, httprouter.Params{})
 	}
@@ -514,6 +518,63 @@ func (a *App) SetPanicHandler(handler PanicAction) {
 
 func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	a.router.ServeHTTP(w, req)
+}
+
+// --------------------------------------------------------------------------------
+// Diagnostics Helpers
+// --------------------------------------------------------------------------------
+
+func (a *App) isDiagnosticsEnabled() bool {
+	return a.diagnostics != nil
+}
+
+func (a *App) isDiagnosticsEventEnabled(eventFlag logger.EventFlag) bool {
+	if !a.isDiagnosticsEnabled() {
+		return false
+	}
+	return a.diagnostics.IsEnabled(eventFlag)
+}
+
+func (a *App) infof(format string, args ...interface{}) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Infof(format, args...)
+	}
+}
+
+func (a *App) errorf(format string, args ...interface{}) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Errorf(format, args...)
+	}
+}
+
+func (a *App) fatalF(format string, args ...interface{}) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Fatalf(format, args...)
+	}
+}
+
+func (a *App) error(err error) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Error(err)
+	}
+}
+
+func (a *App) fatal(err error) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.Fatal(err)
+	}
+}
+
+func (a *App) fatalWithReq(err error, req *http.Request) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.FatalWithReq(err, req)
+	}
+}
+
+func (a *App) onEvent(eventFlag logger.EventFlag, state ...interface{}) {
+	if a.isDiagnosticsEnabled() {
+		a.diagnostics.OnEvent(eventFlag, state...)
+	}
 }
 
 // --------------------------------------------------------------------------------
@@ -542,24 +603,22 @@ func (a *App) renderAction(action Action) httprouter.Handle {
 }
 
 func (a *App) setCommonResponseHeaders(w http.ResponseWriter) {
-	w.Header().Set("Vary", "Accept-Encoding")
-	w.Header().Set("X-Served-By", "github.com/blendlabs/go-web")
-	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
-	w.Header().Set("X-Xss-Protection", "1; mode=block")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set(HeaderServer, PackageName)
+	w.Header().Set(HeaderXServedBy, PackageName)
 }
 
 func (a *App) newResponse(w http.ResponseWriter, r *http.Request) ResponseWriter {
 	var response ResponseWriter
 	if a.shouldCompressOutput(r) {
-		w.Header().Set("Content-Encoding", "gzip")
-		if a.diagnostics.IsEnabled(logger.EventWebResponse) {
+		w.Header().Set(HeaderContentEncoding, ContentEncodingGZIP)
+		if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
 			response = NewBufferedCompressedResponseWriter(w)
 		} else {
 			response = NewCompressedResponseWriter(w)
 		}
 	} else {
-		if a.diagnostics.IsEnabled(logger.EventWebResponse) {
+		w.Header().Set(HeaderContentEncoding, ContentEncodingIdentity)
+		if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
 			response = NewBufferedResponseWriter(w)
 		} else {
 			response = NewResponseWriter(w)
@@ -575,7 +634,7 @@ func (a *App) shouldCompressOutput(r *http.Request) bool {
 func (a *App) pipelineInit(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
 	context := a.newCtx(w, r, p)
 	context.onRequestStart()
-	a.diagnostics.OnEvent(logger.EventWebRequestStart, context)
+	a.onEvent(logger.EventWebRequestStart, context)
 	return context
 }
 
@@ -583,52 +642,53 @@ var controllerNoOp = func(_ *Ctx) Result { return nil }
 
 // Ctx creates a context.
 func (a *App) newCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
-	rc := NewCtx(w, r, p)
-	rc.app = a
-	rc.auth = a.auth
-	rc.tx = a.tx
-	rc.diagnostics = a.diagnostics
-	rc.config = a.config
+	ctx := NewCtx(w, r, p)
+	ctx.app = a
+	ctx.auth = a.auth
+	ctx.tx = a.tx
+	ctx.diagnostics = a.diagnostics
+	ctx.config = a.config
 
 	if a.defaultResultProvider != nil {
 		// the defaultResultProvider is a middleware, or func(action) action
 		// we need to nest the middleware, then call it with rc
 		// to apply the middleware sside effects to rc
-		NestMiddleware(controllerNoOp, a.defaultResultProvider)(rc)
+		NestMiddleware(controllerNoOp, a.defaultResultProvider)(ctx)
 	} else {
-		rc.SetDefaultResultProvider(rc.Text())
+		ctx.SetDefaultResultProvider(ctx.Text())
 	}
 
-	return rc
+	return ctx
 }
 
-func (a *App) renderResult(action Action, context *Ctx) error {
-	result := action(context)
+func (a *App) renderResult(action Action, ctx *Ctx) error {
+	result := action(ctx)
 	if result != nil {
-		err := result.Render(context)
+		err := result.Render(ctx)
 		if err != nil {
-			a.diagnostics.Error(err)
+			a.error(err)
 			return err
 		}
 	}
 	return nil
 }
 
-func (a *App) pipelineComplete(context *Ctx) {
-	err := context.Response.Flush()
+func (a *App) pipelineComplete(ctx *Ctx) {
+	err := ctx.Response.Flush()
 	if err != nil && err != http.ErrBodyNotAllowed {
-		a.diagnostics.Error(err)
+		a.error(err)
 	}
-	context.onRequestEnd()
-	context.setLoggedStatusCode(context.Response.StatusCode())
-	context.setLoggedContentLength(context.Response.ContentLength())
-	if a.diagnostics.IsEnabled(logger.EventWebResponse) {
-		a.diagnostics.OnEvent(logger.EventWebResponse, context.Response.Bytes())
+	ctx.onRequestEnd()
+	ctx.setLoggedStatusCode(ctx.Response.StatusCode())
+	ctx.setLoggedContentLength(ctx.Response.ContentLength())
+	if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
+		a.onEvent(logger.EventWebResponse, ctx.Response.Bytes())
 	}
-	a.diagnostics.OnEvent(logger.EventWebRequest, context)
 
-	err = context.Response.Close()
+	// effectively "request complete"
+	a.onEvent(logger.EventWebRequest, ctx)
+	err = ctx.Response.Close()
 	if err != nil && err != http.ErrBodyNotAllowed {
-		a.diagnostics.Error(err)
+		a.error(err)
 	}
 }

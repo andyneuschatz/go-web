@@ -52,7 +52,9 @@ func TestCtxPostBodyAsString(t *testing.T) {
 
 	context, err := NewMockRequestBuilder(nil).WithPostBody([]byte("test payload")).Ctx(nil)
 	assert.Nil(err)
-	assert.Equal("test payload", context.PostBodyAsString())
+	body, err := context.PostBodyAsString()
+	assert.Nil(err)
+	assert.Equal("test payload", body)
 }
 
 func TestCtxPostBodyAsJSON(t *testing.T) {

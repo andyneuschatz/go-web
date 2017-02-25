@@ -12,7 +12,18 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func TestAppSetLogger(t *testing.T) {
+func TestAppNoDiagnostics(t *testing.T) {
+	assert := assert.New(t)
+
+	app := New()
+	app.GET("/", func(c *Ctx) Result {
+		return c.Raw([]byte("ok!"))
+	})
+
+	assert.Nil(app.Mock().Get("/").Execute())
+}
+
+func TestAppSetDiagnostics(t *testing.T) {
 	assert := assert.New(t)
 
 	app := New()
@@ -40,7 +51,7 @@ func TestAppCtx(t *testing.T) {
 	rc, err := app.Mock().WithResponseBuffer(response).Ctx(nil)
 	assert.Nil(err)
 	assert.NotNil(rc)
-	assert.NotNil(rc.diagnostics)
+	assert.Nil(rc.diagnostics)
 
 	result := rc.Raw([]byte("foo"))
 	assert.NotNil(result)

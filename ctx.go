@@ -289,32 +289,52 @@ func (rc *Ctx) ParamBool(name string) (bool, error) {
 	return lower == "true" || lower == "1" || lower == "yes", nil
 }
 
+func (rc *Ctx) onPostBody(bodyContents []byte) {
+	if rc.diagnostics != nil {
+		rc.diagnostics.OnEvent(logger.EventWebRequestPostBody, rc.postBody)
+	}
+}
+
 // PostBody returns the bytes in a post body.
-func (rc *Ctx) PostBody() []byte {
+func (rc *Ctx) PostBody() ([]byte, error) {
+	var err error
 	if len(rc.postBody) == 0 {
 		defer rc.Request.Body.Close()
-		rc.postBody, _ = ioutil.ReadAll(rc.Request.Body)
-		if rc.diagnostics != nil {
-			rc.diagnostics.OnEvent(logger.EventWebRequestPostBody, rc.postBody)
+		rc.postBody, err = ioutil.ReadAll(rc.Request.Body)
+		if err != nil {
+			return nil, err
 		}
+		rc.onPostBody(rc.postBody)
 	}
 
-	return rc.postBody
+	return rc.postBody, err
 }
 
 // PostBodyAsString returns the post body as a string.
-func (rc *Ctx) PostBodyAsString() string {
-	return string(rc.PostBody())
+func (rc *Ctx) PostBodyAsString() (string, error) {
+	body, err := rc.PostBody()
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
 // PostBodyAsJSON reads the incoming post body (closing it) and marshals it to the target object as json.
 func (rc *Ctx) PostBodyAsJSON(response interface{}) error {
-	return json.Unmarshal(rc.PostBody(), response)
+	body, err := rc.PostBody()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, response)
 }
 
 // PostBodyAsXML reads the incoming post body (closing it) and marshals it to the target object as xml.
 func (rc *Ctx) PostBodyAsXML(response interface{}) error {
-	return xml.Unmarshal(rc.PostBody(), response)
+	body, err := rc.PostBody()
+	if err != nil {
+		return err
+	}
+	return xml.Unmarshal(body, response)
 }
 
 // PostedFiles returns any files posted
