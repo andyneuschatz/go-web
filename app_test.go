@@ -12,6 +12,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+func controllerNoOp(_ *Ctx) Result { return nil }
+
 func TestAppNoDiagnostics(t *testing.T) {
 	assert := assert.New(t)
 
@@ -196,7 +198,7 @@ func TestAppProviderMiddlewareOrder(t *testing.T) {
 func TestAppDefaultResultProvider(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
-	assert.NotNil(app.DefaultResultProvider())
+	assert.Nil(app.DefaultMiddleware())
 
 	rc := app.newCtx(nil, nil, nil)
 	assert.Nil(rc.view)
@@ -207,13 +209,22 @@ func TestAppDefaultResultProvider(t *testing.T) {
 func TestAppDefaultResultProviderWithDefault(t *testing.T) {
 	assert := assert.New(t)
 	app := New()
-	app.SetDefaultResultProvider(ViewProviderAsDefault)
-	assert.NotNil(app.DefaultResultProvider())
+	app.SetDefaultMiddleware(ViewProviderAsDefault)
+	assert.NotNil(app.DefaultMiddleware())
 
 	rc := app.newCtx(nil, nil, nil)
-	assert.NotNil(rc.view)
+	assert.Nil(rc.view)
 	assert.Nil(rc.api)
+
+	// this will be set to the default initially
 	assert.NotNil(rc.defaultResultProvider)
+
+	app.GET("/", func(ctx *Ctx) Result {
+		assert.NotNil(ctx.DefaultResultProvider())
+		_, isTyped := ctx.DefaultResultProvider().(*ViewResultProvider)
+		assert.True(isTyped)
+		return nil
+	})
 }
 
 func TestAppDefaultResultProviderWithDefaultFromRoute(t *testing.T) {
@@ -221,13 +232,13 @@ func TestAppDefaultResultProviderWithDefaultFromRoute(t *testing.T) {
 
 	app := New()
 	app.ViewCache().Templates().New(DefaultTemplateNotAuthorized).Parse("<html><body><h4>Not Authorized</h4></body></html>")
-	app.SetDefaultResultProvider(APIProviderAsDefault)
+	app.SetDefaultMiddleware(APIProviderAsDefault)
 	app.GET("/", controllerNoOp, SessionRequired, ViewProviderAsDefault)
 
 	//somehow assert that the content type is html
 	meta, err := app.Mock().WithPathf("/").ExecuteWithMeta()
 	assert.Nil(err)
-	assert.Equal(ContentTypeHTML, meta.Headers.Get("Content-Type"))
+	assert.Equal(ContentTypeHTML, meta.Headers.Get(HeaderContentType))
 }
 
 func TestAppViewResult(t *testing.T) {

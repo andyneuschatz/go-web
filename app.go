@@ -18,6 +18,12 @@ import (
 )
 
 const (
+	// EnvironmentVariableBindAddr is an env var that determines (if set) what the bind address should be.
+	EnvironmentVariableBindAddr = "BIND_ADDR"
+
+	// EnvironmentVariablePort is an env var that determines what the default bind address port segment returns.
+	EnvironmentVariablePort = "PORT"
+
 	// EnvironmentVariableTLSCert is an env var that contains the TLS cert.
 	EnvironmentVariableTLSCert = "TLS_CERT"
 
@@ -29,6 +35,9 @@ const (
 
 	// EnvironmentVariableTLSKeyFile is an env var that contains the file path to the TLS key.
 	EnvironmentVariableTLSKeyFile = "TLS_KEY_FILE"
+
+	// DefaultPort is the default port the server binds to.
+	DefaultPort = "8080"
 )
 
 // New returns a new app.
@@ -49,9 +58,10 @@ type AppStartDelegate func(app *App) error
 
 // App is the server for the app.
 type App struct {
-	name   string
-	domain string
-	port   string
+	name     string
+	domain   string
+	bindAddr string
+	port     string
 
 	logger *logger.Agent
 	config interface{}
@@ -68,7 +78,7 @@ type App struct {
 
 	panicHandler PanicAction
 
-	defaultResultProvider Middleware
+	defaultMiddleware []Middleware
 
 	viewCache *ViewCache
 
@@ -262,35 +272,36 @@ func (a *App) Tx() *sql.Tx {
 	return a.tx
 }
 
-// Port returns the port for the app.
-func (a *App) Port() string {
-	if len(a.port) != 0 {
-		return a.port
-	}
-	envVar := os.Getenv("PORT")
-	if len(envVar) != 0 {
-		return envVar
-	}
-
-	return "8080"
-}
-
 // SetPort sets the port the app listens on.
+// If BindAddr is not set, this will be returned in the form
+// :Port(), as a result the server will bind to all available interfaces.
 func (a *App) SetPort(port string) {
 	a.port = port
 }
 
-// SetDefaultResultProvider sets the application wide default result provider.
-func (a *App) SetDefaultResultProvider(resultProvider Middleware) {
-	a.defaultResultProvider = resultProvider
+// Port returns the port for the app.
+// Port is the last in precedence behind BindAddr() for what
+// ultimately forms the bind address the server binds to.
+func (a *App) Port() string {
+	if len(a.port) != 0 {
+		return a.port
+	}
+	envVar := os.Getenv(EnvironmentVariablePort)
+	if len(envVar) != 0 {
+		return envVar
+	}
+
+	return DefaultPort
 }
 
-// DefaultResultProvider returns the default result provider.
-func (a *App) DefaultResultProvider() Middleware {
-	if a.defaultResultProvider == nil {
-		return APIProviderAsDefault
-	}
-	return a.defaultResultProvider
+// SetDefaultMiddleware sets the application wide default middleware.
+func (a *App) SetDefaultMiddleware(middleware ...Middleware) {
+	a.defaultMiddleware = middleware
+}
+
+// DefaultMiddleware returns the default middleware.
+func (a *App) DefaultMiddleware() []Middleware {
+	return a.defaultMiddleware
 }
 
 // OnStart lets you register a task that is run before the server starts.
@@ -299,11 +310,32 @@ func (a *App) OnStart(action AppStartDelegate) {
 	a.startDelegate = action
 }
 
+// SetBindAddr sets the bind address of the server.
+// It is the first in order of precedence for what ultimately will
+// form the bind address that the server binds to.
+func (a *App) SetBindAddr(bindAddr string) {
+	a.bindAddr = bindAddr
+}
+
+// BindAddr returns the address the server will bind to.
+func (a *App) BindAddr() string {
+	if len(a.bindAddr) > 0 {
+		return a.bindAddr
+	}
+
+	envVar := os.Getenv(EnvironmentVariableBindAddr)
+	if len(envVar) > 0 {
+		return envVar
+	}
+
+	return fmt.Sprintf(":%s", a.Port())
+}
+
 // Server returns the basic http.Server for the app.
 func (a *App) Server() *http.Server {
-	bindAddr := fmt.Sprintf(":%s", a.Port())
+
 	return &http.Server{
-		Addr:              bindAddr,
+		Addr:              a.BindAddr(),
 		Handler:           a,
 		ReadTimeout:       a.readTimeout,
 		ReadHeaderTimeout: a.readHeaderTimeout,
@@ -377,39 +409,55 @@ func (a *App) Register(c Controller) {
 	c.Register(a)
 }
 
+func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action {
+	finalMiddleware := make([]Middleware, len(middleware)+len(a.defaultMiddleware))
+	cursor := len(finalMiddleware) - 1
+	for i := len(a.defaultMiddleware) - 1; i >= 0; i-- {
+		finalMiddleware[cursor] = a.defaultMiddleware[i]
+		cursor--
+	}
+
+	for i := len(middleware) - 1; i >= 0; i-- {
+		finalMiddleware[cursor] = middleware[i]
+		cursor--
+	}
+
+	return NestMiddleware(action, finalMiddleware...)
+}
+
 // GET registers a GET request handler.
 func (a *App) GET(path string, action Action, middleware ...Middleware) {
-	a.router.GET(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.GET(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // OPTIONS registers a OPTIONS request handler.
 func (a *App) OPTIONS(path string, action Action, middleware ...Middleware) {
-	a.router.OPTIONS(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.OPTIONS(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // HEAD registers a HEAD request handler.
 func (a *App) HEAD(path string, action Action, middleware ...Middleware) {
-	a.router.HEAD(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.HEAD(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // PUT registers a PUT request handler.
 func (a *App) PUT(path string, action Action, middleware ...Middleware) {
-	a.router.PUT(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.PUT(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // PATCH registers a PATCH request handler.
 func (a *App) PATCH(path string, action Action, middleware ...Middleware) {
-	a.router.PATCH(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.PATCH(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // POST registers a POST request actions.
 func (a *App) POST(path string, action Action, middleware ...Middleware) {
-	a.router.POST(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.POST(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // DELETE registers a DELETE request handler.
 func (a *App) DELETE(path string, action Action, middleware ...Middleware) {
-	a.router.DELETE(path, a.renderAction(NestMiddleware(action, middleware...)))
+	a.router.DELETE(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // --------------------------------------------------------------------------------
@@ -638,8 +686,6 @@ func (a *App) pipelineInit(w ResponseWriter, r *http.Request, p RouteParameters)
 	return context
 }
 
-var controllerNoOp = func(_ *Ctx) Result { return nil }
-
 // Ctx creates a context.
 func (a *App) newCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
 	ctx := NewCtx(w, r, p)
@@ -649,14 +695,8 @@ func (a *App) newCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx 
 	ctx.logger = a.logger
 	ctx.config = a.config
 
-	if a.defaultResultProvider != nil {
-		// the defaultResultProvider is a middleware, or func(action) action
-		// we need to nest the middleware, then call it with rc
-		// to apply the middleware sside effects to rc
-		NestMiddleware(controllerNoOp, a.defaultResultProvider)(ctx)
-	} else {
-		ctx.SetDefaultResultProvider(ctx.Text())
-	}
+	// it is assumed that default middleware will override this at some point.
+	ctx.SetDefaultResultProvider(ctx.Text())
 
 	return ctx
 }
