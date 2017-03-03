@@ -7,9 +7,6 @@ import (
 
 	logger "github.com/blendlabs/go-logger"
 	"github.com/blendlabs/go-web"
-
-	"net/http"
-	_ "net/http/pprof"
 )
 
 const (
@@ -56,15 +53,13 @@ func jsonResultHandler(ctx *web.Ctx) web.Result {
 }
 
 func main() {
-
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	app := web.New()
 	app.SetPort(port())
-	app.SetDiagnostics(logger.NewDiagnosticsAgentFromEnvironment())
+	app.SetLogger(logger.NewFromEnvironment())
 	app.GET("/json", jsonHandler)
 	app.GET("/json_result", jsonResultHandler)
+	app.GET("/status", func(ctx *web.Ctx) web.Result {
+		return ctx.Raw([]byte(`{"status":"ok!"}`))
+	})
 	log.Fatal(app.Start())
 }

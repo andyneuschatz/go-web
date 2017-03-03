@@ -67,6 +67,11 @@ func (mrb *MockRequestBuilder) Put(pathFormat string, args ...interface{}) *Mock
 	return mrb.WithVerb("PUT").WithPathf(pathFormat, args...)
 }
 
+// Patch is a shortcut for WithVerb("PATCH") WithPathf(pathFormat, args...)
+func (mrb *MockRequestBuilder) Patch(pathFormat string, args ...interface{}) *MockRequestBuilder {
+	return mrb.WithVerb("PATCH").WithPathf(pathFormat, args...)
+}
+
 // Delete is a shortcut for WithVerb("DELETE") WithPathf(pathFormat, args...)
 func (mrb *MockRequestBuilder) Delete(pathFormat string, args ...interface{}) *MockRequestBuilder {
 	return mrb.WithVerb("DELETE").WithPathf(pathFormat, args...)
