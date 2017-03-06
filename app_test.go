@@ -111,7 +111,7 @@ func TestAppMiddleWarePipeline(t *testing.T) {
 		},
 	)
 
-	result, err := app.Mock().WithPathf("/").FetchResponseAsBytes()
+	result, err := app.Mock().WithPathf("/").Bytes()
 	assert.Nil(err)
 	assert.True(didRun)
 	assert.Equal("foo", string(result))
@@ -140,7 +140,7 @@ func TestAppStatic(t *testing.T) {
 	app := New()
 	app.Static("/static/*filepath", http.Dir("testdata"))
 
-	index, err := app.Mock().WithPathf("/static/test_file.html").FetchResponseAsBytes()
+	index, err := app.Mock().WithPathf("/static/test_file.html").Bytes()
 	assert.Nil(err)
 	assert.True(strings.Contains(string(index), "Test!"), string(index))
 }
@@ -152,7 +152,7 @@ func TestAppStaticSingleFile(t *testing.T) {
 		return r.Static("testdata/test_file.html")
 	})
 
-	index, err := app.Mock().WithPathf("/").FetchResponseAsBytes()
+	index, err := app.Mock().WithPathf("/").Bytes()
 	assert.Nil(err)
 	assert.True(strings.Contains(string(index), "Test!"), string(index))
 }
@@ -250,7 +250,7 @@ func TestAppViewResult(t *testing.T) {
 		return r.View().View("test", "foobarbaz")
 	})
 
-	meta, res, err := app.Mock().WithPathf("/").FetchResponseAsBytesWithMeta()
+	res, meta, err := app.Mock().WithPathf("/").BytesWithMeta()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.Equal(ContentTypeHTML, meta.Headers.Get(HeaderContentType))
