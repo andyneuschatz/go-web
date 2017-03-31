@@ -699,7 +699,7 @@ func (a *App) SetPanicHandler(handler PanicAction) {
 	a.panicAction = handler
 	a.panicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
 		a.renderAction(func(ctx *Ctx) Result {
-			a.logger.ErrorEventWithState(logger.EventFatalError, fmt.Errorf("%v", err), ctx)
+			a.logger.ErrorEventWithState(logger.EventFatalError, logger.ColorRed, fmt.Errorf("%v", err), ctx)
 			return handler(ctx, err)
 		})(w, r, nil, nil)
 	}

@@ -572,7 +572,7 @@ func (rc *Ctx) Logger() *logger.Agent {
 
 func (rc *Ctx) logFatal(err error) {
 	if rc.logger != nil {
-		rc.logger.ErrorEventWithState(logger.EventFatalError, err, rc)
+		rc.logger.ErrorEventWithState(logger.EventFatalError, logger.ColorRed, err, rc)
 	}
 }
 
