@@ -234,10 +234,10 @@ func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 
 func (mrb *MockRequestBuilder) lookup(verb, path string) (route *Route, params RouteParameters, err error) {
 	var tsr bool
-	route, params, tsr = mrb.app.lookup(verb, path)
+	route, params, tsr = mrb.app.Lookup(verb, path)
 	if tsr {
 		path = path + "/"
-		route, params, tsr = mrb.app.lookup(verb, path)
+		route, params, tsr = mrb.app.Lookup(verb, path)
 		if route == nil {
 			err = exception.Newf("no matching route for path %s `%s`", mrb.verb, mrb.path)
 		}

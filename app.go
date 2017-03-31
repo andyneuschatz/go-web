@@ -522,7 +522,8 @@ func (a *App) allowed(path, reqMethod string) (allow string) {
 	return
 }
 
-func (a *App) lookup(method, path string) (route *Route, params RouteParameters, slashRedirect bool) {
+// Lookup finds the route data for a given method and path.
+func (a *App) Lookup(method, path string) (route *Route, params RouteParameters, slashRedirect bool) {
 	if root := a.routes[method]; root != nil {
 		return root.getValue(path)
 	}
@@ -730,7 +731,7 @@ func (a *App) errorf(format string, args ...interface{}) {
 	}
 }
 
-func (a *App) fatalF(format string, args ...interface{}) {
+func (a *App) fatalf(format string, args ...interface{}) {
 	if a.isDiagnosticsEnabled() {
 		a.logger.Fatalf(format, args...)
 	}

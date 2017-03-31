@@ -143,7 +143,7 @@ func (rc *Ctx) TxRollback(rollbacker func() error) error {
 // View returns the view result provider.
 func (rc *Ctx) View() *ViewResultProvider {
 	if rc.view == nil {
-		rc.view = NewViewResultProvider(rc.app.logger, rc.app.viewCache, rc)
+		rc.view = NewViewResultProvider(rc, rc.app.viewCache)
 	}
 	return rc.view
 }
@@ -151,7 +151,7 @@ func (rc *Ctx) View() *ViewResultProvider {
 // API returns the view result provider.
 func (rc *Ctx) API() *APIResultProvider {
 	if rc.api == nil {
-		rc.api = NewAPIResultProvider(rc.app.logger, rc)
+		rc.api = NewAPIResultProvider(rc)
 	}
 	return rc.api
 }
@@ -159,7 +159,7 @@ func (rc *Ctx) API() *APIResultProvider {
 // JSON returns the JSON result provider.
 func (rc *Ctx) JSON() *JSONResultProvider {
 	if rc.json == nil {
-		rc.json = NewJSONResultProvider(rc.logger, rc)
+		rc.json = NewJSONResultProvider(rc)
 	}
 	return rc.json
 }
@@ -167,7 +167,7 @@ func (rc *Ctx) JSON() *JSONResultProvider {
 // XML returns the xml result provider.
 func (rc *Ctx) XML() *XMLResultProvider {
 	if rc.xml == nil {
-		rc.xml = NewXMLResultProvider(rc.app.logger, rc)
+		rc.xml = NewXMLResultProvider(rc)
 	}
 	return rc.xml
 }
@@ -175,7 +175,7 @@ func (rc *Ctx) XML() *XMLResultProvider {
 // Text returns the text result provider.
 func (rc *Ctx) Text() *TextResultProvider {
 	if rc.text == nil {
-		rc.text = NewTextResultProvider(rc.app.logger, rc)
+		rc.text = NewTextResultProvider(rc)
 	}
 	return rc.text
 }
@@ -185,7 +185,7 @@ func (rc *Ctx) Text() *TextResultProvider {
 // steps that set it for you.
 func (rc *Ctx) DefaultResultProvider() ResultProvider {
 	if rc.defaultResultProvider == nil {
-		rc.defaultResultProvider = NewTextResultProvider(rc.logger, rc)
+		rc.defaultResultProvider = NewTextResultProvider(rc)
 	}
 	return rc.defaultResultProvider
 }
@@ -570,9 +570,10 @@ func (rc *Ctx) Logger() *logger.Agent {
 	return rc.logger
 }
 
-// Config returns the app config.
-func (rc *Ctx) Config() interface{} {
-	return rc.config
+func (rc *Ctx) logFatal(err error) {
+	if rc.logger != nil {
+		rc.logger.FatalWithReq(err, rc.Request)
+	}
 }
 
 // --------------------------------------------------------------------------------

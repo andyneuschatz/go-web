@@ -14,7 +14,7 @@ import (
 func TestAPIResultProviderNotFound(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).NotFound()
+	result := NewAPIResultProvider(nil).NotFound()
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)
@@ -24,7 +24,7 @@ func TestAPIResultProviderNotFound(t *testing.T) {
 func TestAPIResultProviderNotAuthorized(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).NotAuthorized()
+	result := NewAPIResultProvider(nil).NotAuthorized()
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)
@@ -34,7 +34,7 @@ func TestAPIResultProviderNotAuthorized(t *testing.T) {
 func TestAPIResultProviderInternalError(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).InternalError(exception.New("Test"))
+	result := NewAPIResultProvider(nil).InternalError(exception.New("Test"))
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)
@@ -71,7 +71,7 @@ func TestAPIResultProviderInternalErrorWritesToLogger(t *testing.T) {
 func TestAPIResultProviderBadRequest(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).BadRequest("test")
+	result := NewAPIResultProvider(nil).BadRequest("test")
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)
@@ -81,7 +81,7 @@ func TestAPIResultProviderBadRequest(t *testing.T) {
 func TestAPIResultProviderOK(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).OK()
+	result := NewAPIResultProvider(nil).OK()
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)
@@ -91,7 +91,7 @@ func TestAPIResultProviderOK(t *testing.T) {
 func TestAPIResultProviderJSON(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewAPIResultProvider(agent(), nil).Result("foo")
+	result := NewAPIResultProvider(nil).Result("foo")
 	assert.NotNil(result)
 	typed, isTyped := result.(*JSONResult)
 	assert.True(isTyped)

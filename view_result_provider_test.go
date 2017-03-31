@@ -19,7 +19,7 @@ func agent() *logger.Agent {
 func TestViewResultProviderNotFound(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewViewResultProvider(agent(), NewViewCache(), nil).NotFound()
+	result := NewViewResultProvider(nil, NewViewCache()).NotFound()
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
@@ -29,7 +29,7 @@ func TestViewResultProviderNotFound(t *testing.T) {
 func TestViewResultProviderNotAuthorized(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewViewResultProvider(agent(), NewViewCache(), nil).NotAuthorized()
+	result := NewViewResultProvider(nil, NewViewCache()).NotAuthorized()
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
@@ -39,7 +39,7 @@ func TestViewResultProviderNotAuthorized(t *testing.T) {
 func TestViewResultProviderInternalError(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewViewResultProvider(agent(), NewViewCache(), nil).InternalError(exception.New("Test"))
+	result := NewViewResultProvider(nil, NewViewCache()).InternalError(exception.New("Test"))
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
@@ -64,7 +64,7 @@ func TestViewResultProviderInternalErrorWritesToLogger(t *testing.T) {
 	rc, err := app.Mock().Ctx(nil)
 	assert.Nil(err)
 
-	result := NewViewResultProvider(app.Logger(), NewViewCache(), rc).InternalError(exception.New("Test"))
+	result := NewViewResultProvider(rc, NewViewCache()).InternalError(exception.New("Test"))
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
@@ -77,7 +77,7 @@ func TestViewResultProviderInternalErrorWritesToLogger(t *testing.T) {
 func TestViewResultProviderBadRequest(t *testing.T) {
 	assert := assert.New(t)
 
-	result := NewViewResultProvider(agent(), NewViewCache(), nil).BadRequest("test")
+	result := NewViewResultProvider(nil, NewViewCache()).BadRequest("test")
 	assert.NotNil(result)
 	typed, isTyped := result.(*ViewResult)
 	assert.True(isTyped)
@@ -94,7 +94,7 @@ func TestViewResultProviderView(t *testing.T) {
 	testView := template.New("testView")
 	testView.Parse("{{.Text}}")
 
-	provider := NewViewResultProvider(agent(), NewViewCache(), nil)
+	provider := NewViewResultProvider(nil, NewViewCache())
 	provider.viewCache.SetTemplates(testView)
 	result := provider.View("testView", testViewModel{Text: "foo"})
 
