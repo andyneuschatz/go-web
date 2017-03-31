@@ -1,6 +1,9 @@
 package web
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 // Handler is the most basic route handler.
 type Handler func(http.ResponseWriter, *http.Request, *Route, RouteParameters)
@@ -14,4 +17,10 @@ type Route struct {
 	Method string
 	Path   string
 	Params []string
+}
+
+// String returns a string representation of the route.
+// Namely: Method_Path
+func (r Route) String() string {
+	return fmt.Sprintf("%s_%s", r.Method, r.Path)
 }
