@@ -817,7 +817,6 @@ func (a *App) shouldCompressOutput(r *http.Request) bool {
 
 func (a *App) pipelineInit(w ResponseWriter, r *http.Request, route *Route, p RouteParameters) *Ctx {
 	context := a.newCtx(w, r, route, p)
-
 	context.onRequestStart()
 	a.onEvent(logger.EventWebRequestStart, context)
 	return context
