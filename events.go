@@ -22,7 +22,11 @@ type RequestListener func(logger.Logger, logger.TimeSource, *Ctx)
 // NewRequestListener creates a new logger.EventListener for `EventRequestStart` and `EventRequest` events.
 func NewRequestListener(listener RequestListener) logger.EventListener {
 	return func(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-		listener(writer, ts, state[0].(*Ctx))
+		if len(state) > 0 {
+			if ctx, isCtx := state[0].(*Ctx); isCtx {
+				listener(writer, ts, ctx)
+			}
+		}
 	}
 }
 
@@ -32,13 +36,17 @@ type ErrorListener func(logger.Logger, logger.TimeSource, error, *Ctx)
 // NewErrorListener returns a new error listener.
 func NewErrorListener(listener ErrorListener) logger.EventListener {
 	return func(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-		err := state[0].(error)
+		if len(state) > 0 {
+			if err, isError := state[0].(error); isError {
 
-		if len(state) > 1 {
-			if ctx, hasCtx := state[1].(*Ctx); hasCtx {
-				listener(writer, ts, err, ctx)
+				if len(state) > 1 {
+					if ctx, hasCtx := state[1].(*Ctx); hasCtx {
+						listener(writer, ts, err, ctx)
+						return
+					}
+				}
+				listener(writer, ts, err, nil)
 			}
 		}
-		listener(writer, ts, err, nil)
 	}
 }
