@@ -42,12 +42,13 @@ const (
 // New returns a new app.
 func New() *App {
 	return &App{
-		staticRewriteRules: map[string][]*RewriteRule{},
-		staticHeaders:      map[string]http.Header{},
-		tlsCertLock:        &sync.Mutex{},
-		auth:               NewAuthManager(),
-		viewCache:          NewViewCache(),
-		readTimeout:        5 * time.Second,
+		staticRewriteRules:    map[string][]*RewriteRule{},
+		staticHeaders:         map[string]http.Header{},
+		tlsCertLock:           &sync.Mutex{},
+		auth:                  NewAuthManager(),
+		viewCache:             NewViewCache(),
+		readTimeout:           5 * time.Second,
+		redirectTrailingSlash: true,
 	}
 }
 
@@ -103,10 +104,10 @@ func (a *App) Name() string {
 
 // SetName sets a log label for the app.
 func (a *App) SetName(name string) {
-	if a.isDiagnosticsEnabled() {
+	a.name = name
+	if a.logger != nil {
 		a.logger.Writer().SetLabel(name)
 	}
-	a.name = name
 }
 
 // Domain returns the domain for the app.
@@ -374,28 +375,28 @@ func (a *App) commonStartupTasks() error {
 func (a *App) StartWithServer(server *http.Server) error {
 	var err error
 	if a.startDelegate != nil {
-		a.infof("Startup tasks starting")
+		a.logger.Infof("Startup tasks starting")
 		err = a.startDelegate(a)
 		if err != nil {
-			a.errorf("Startup tasks error: %v", err)
+			a.logger.Errorf("Startup tasks error: %v", err)
 			return err
 		}
-		a.infof("Startup tasks complete")
+		a.logger.Infof("Startup tasks complete")
 	}
 
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.errorf("Startup tasks error: %v", err)
+		a.logger.Errorf("Startup tasks error: %v", err)
 		return err
 	}
 
-	if a.isDiagnosticsEnabled() {
+	if a.logger != nil && a.logger.IsEnabled(logger.EventInfo) {
 		serverProtocol := "HTTP"
 		if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
 			serverProtocol = "HTTPS (TLS)"
 		}
-		a.infof("%s server started, listening on %s", serverProtocol, server.Addr)
-		a.infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
+		a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
+		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	}
 
 	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
@@ -698,66 +699,9 @@ func (a *App) SetPanicHandler(handler PanicAction) {
 	a.panicAction = handler
 	a.panicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
 		a.renderAction(func(ctx *Ctx) Result {
-			a.fatalWithReq(fmt.Errorf("%v", err), ctx.Request)
+			a.logger.ErrorEventWithState(logger.EventFatalError, fmt.Errorf("%v", err), ctx)
 			return handler(ctx, err)
 		})(w, r, nil, nil)
-	}
-}
-
-// --------------------------------------------------------------------------------
-// Diagnostics Helpers
-// --------------------------------------------------------------------------------
-
-func (a *App) isDiagnosticsEnabled() bool {
-	return a.logger != nil
-}
-
-func (a *App) isDiagnosticsEventEnabled(eventFlag logger.EventFlag) bool {
-	if !a.isDiagnosticsEnabled() {
-		return false
-	}
-	return a.logger.IsEnabled(eventFlag)
-}
-
-func (a *App) infof(format string, args ...interface{}) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.Infof(format, args...)
-	}
-}
-
-func (a *App) errorf(format string, args ...interface{}) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.Errorf(format, args...)
-	}
-}
-
-func (a *App) fatalf(format string, args ...interface{}) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.Fatalf(format, args...)
-	}
-}
-
-func (a *App) error(err error) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.Error(err)
-	}
-}
-
-func (a *App) fatal(err error) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.Fatal(err)
-	}
-}
-
-func (a *App) fatalWithReq(err error, req *http.Request) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.FatalWithReq(err, req)
-	}
-}
-
-func (a *App) onEvent(eventFlag logger.EventFlag, state ...interface{}) {
-	if a.isDiagnosticsEnabled() {
-		a.logger.OnEvent(eventFlag, state...)
 	}
 }
 
@@ -795,14 +739,14 @@ func (a *App) newResponse(w http.ResponseWriter, r *http.Request) ResponseWriter
 	var response ResponseWriter
 	if a.shouldCompressOutput(r) {
 		w.Header().Set(HeaderContentEncoding, ContentEncodingGZIP)
-		if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
+		if a.logger.IsEnabled(logger.EventWebResponse) {
 			response = NewBufferedCompressedResponseWriter(w)
 		} else {
 			response = NewCompressedResponseWriter(w)
 		}
 	} else {
 		w.Header().Set(HeaderContentEncoding, ContentEncodingIdentity)
-		if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
+		if a.logger.IsEnabled(logger.EventWebResponse) {
 			response = NewBufferedResponseWriter(w)
 		} else {
 			response = NewResponseWriter(w)
@@ -818,7 +762,7 @@ func (a *App) shouldCompressOutput(r *http.Request) bool {
 func (a *App) pipelineInit(w ResponseWriter, r *http.Request, route *Route, p RouteParameters) *Ctx {
 	context := a.newCtx(w, r, route, p)
 	context.onRequestStart()
-	a.onEvent(logger.EventWebRequestStart, context)
+	a.logger.OnEvent(logger.EventWebRequestStart, context)
 	return context
 }
 
@@ -843,7 +787,7 @@ func (a *App) renderResult(action Action, ctx *Ctx) error {
 	if result != nil {
 		err := result.Render(ctx)
 		if err != nil {
-			a.error(err)
+			a.logger.Error(err)
 			return err
 		}
 	}
@@ -853,19 +797,19 @@ func (a *App) renderResult(action Action, ctx *Ctx) error {
 func (a *App) pipelineComplete(ctx *Ctx) {
 	err := ctx.Response.Flush()
 	if err != nil && err != http.ErrBodyNotAllowed {
-		a.error(err)
+		a.logger.Error(err)
 	}
 	ctx.onRequestEnd()
 	ctx.setLoggedStatusCode(ctx.Response.StatusCode())
 	ctx.setLoggedContentLength(ctx.Response.ContentLength())
-	if a.isDiagnosticsEventEnabled(logger.EventWebResponse) {
-		a.onEvent(logger.EventWebResponse, ctx.Response.Bytes())
+	if a.logger.IsEnabled(logger.EventWebResponse) {
+		a.logger.OnEvent(logger.EventWebResponse, ctx.Response.Bytes())
 	}
 
 	// effectively "request complete"
-	a.onEvent(logger.EventWebRequest, ctx)
+	a.logger.OnEvent(logger.EventWebRequest, ctx)
 	err = ctx.Response.Close()
 	if err != nil && err != http.ErrBodyNotAllowed {
-		a.error(err)
+		a.logger.Error(err)
 	}
 }
