@@ -14,7 +14,6 @@ import (
 
 	exception "github.com/blendlabs/go-exception"
 	logger "github.com/blendlabs/go-logger"
-	"github.com/julienschmidt/httprouter"
 )
 
 const (
@@ -43,7 +42,6 @@ const (
 // New returns a new app.
 func New() *App {
 	return &App{
-		router:             httprouter.New(),
 		staticRewriteRules: map[string][]*RewriteRule{},
 		staticHeaders:      map[string]http.Header{},
 		tlsCertLock:        &sync.Mutex{},
@@ -65,7 +63,6 @@ type App struct {
 
 	logger *logger.Agent
 	config interface{}
-	router *httprouter.Router
 
 	tlsCertBytes, tlsKeyBytes []byte
 	tlsCertLock               *sync.Mutex
@@ -76,7 +73,14 @@ type App struct {
 	staticRewriteRules map[string][]*RewriteRule
 	staticHeaders      map[string]http.Header
 
-	panicHandler PanicAction
+	routes                  map[string]*node
+	notFoundHandler         Handler
+	methodNotAllowedHandler Handler
+	panicHandler            PanicHandler
+	panicAction             PanicAction
+	redirectTrailingSlash   bool
+	handleOptions           bool
+	handleMethodNotAllowed  bool
 
 	defaultMiddleware []Middleware
 
@@ -427,37 +431,172 @@ func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action
 
 // GET registers a GET request handler.
 func (a *App) GET(path string, action Action, middleware ...Middleware) {
-	a.router.GET(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("GET", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // OPTIONS registers a OPTIONS request handler.
 func (a *App) OPTIONS(path string, action Action, middleware ...Middleware) {
-	a.router.OPTIONS(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("OPTIONS", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // HEAD registers a HEAD request handler.
 func (a *App) HEAD(path string, action Action, middleware ...Middleware) {
-	a.router.HEAD(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("HEAD", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // PUT registers a PUT request handler.
 func (a *App) PUT(path string, action Action, middleware ...Middleware) {
-	a.router.PUT(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("PUT", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // PATCH registers a PATCH request handler.
 func (a *App) PATCH(path string, action Action, middleware ...Middleware) {
-	a.router.PATCH(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("PATCH", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // POST registers a POST request actions.
 func (a *App) POST(path string, action Action, middleware ...Middleware) {
-	a.router.POST(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("POST", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
 // DELETE registers a DELETE request handler.
 func (a *App) DELETE(path string, action Action, middleware ...Middleware) {
-	a.router.DELETE(path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+	a.handle("DELETE", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
+}
+
+func (a *App) handle(method, path string, handler Handler) {
+	if len(path) == 0 {
+		panic("path must not be empty")
+	}
+	if path[0] != '/' {
+		panic("path must begin with '/' in path '" + path + "'")
+	}
+	if a.routes == nil {
+		a.routes = make(map[string]*node)
+	}
+
+	root := a.routes[method]
+	if root == nil {
+		root = new(node)
+		a.routes[method] = root
+	}
+
+	root.addRoute(method, path, handler)
+}
+
+func (a *App) allowed(path, reqMethod string) (allow string) {
+	if path == "*" { // server-wide
+		for method := range a.routes {
+			if method == "OPTIONS" {
+				continue
+			}
+
+			// add request method to list of allowed methods
+			if len(allow) == 0 {
+				allow = method
+			} else {
+				allow += ", " + method
+			}
+		}
+		return
+	}
+	for method := range a.routes {
+		// Skip the requested method - we already tried this one
+		if method == reqMethod || method == "OPTIONS" {
+			continue
+		}
+
+		handle, _, _ := a.routes[method].getValue(path)
+		if handle != nil {
+			// add request method to list of allowed methods
+			if len(allow) == 0 {
+				allow = method
+			} else {
+				allow += ", " + method
+			}
+		}
+	}
+	if len(allow) > 0 {
+		allow += ", OPTIONS"
+	}
+	return
+}
+
+func (a *App) lookup(method, path string) (route *Route, params RouteParameters, slashRedirect bool) {
+	if root := a.routes[method]; root != nil {
+		return root.getValue(path)
+	}
+	return nil, nil, false
+}
+
+func (a *App) recv(w http.ResponseWriter, req *http.Request) {
+	if rcv := recover(); rcv != nil {
+		a.panicHandler(w, req, rcv)
+	}
+}
+
+// ServeHTTP makes the router implement the http.Handler interface.
+func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if a.panicHandler != nil {
+		defer a.recv(w, req)
+	}
+
+	path := req.URL.Path
+
+	if root := a.routes[req.Method]; root != nil {
+		if route, params, tsr := root.getValue(path); route != nil {
+			route.Handler(w, req, params)
+			return
+		} else if req.Method != "CONNECT" && path != "/" {
+			code := 301 // Permanent redirect, request with GET method
+			if req.Method != "GET" {
+				code = 307
+			}
+
+			if tsr && a.redirectTrailingSlash {
+				if len(path) > 1 && path[len(path)-1] == '/' {
+					req.URL.Path = path[:len(path)-1]
+				} else {
+					req.URL.Path = path + "/"
+				}
+				http.Redirect(w, req, req.URL.String(), code)
+				return
+			}
+		}
+	}
+
+	if req.Method == "OPTIONS" {
+		// Handle OPTIONS requests
+		if a.handleOptions {
+			if allow := a.allowed(path, req.Method); len(allow) > 0 {
+				w.Header().Set("Allow", allow)
+				return
+			}
+		}
+	} else {
+		// Handle 405
+		if a.handleMethodNotAllowed {
+			if allow := a.allowed(path, req.Method); len(allow) > 0 {
+				w.Header().Set("Allow", allow)
+				if a.methodNotAllowedHandler != nil {
+					a.methodNotAllowedHandler(w, req, nil)
+				} else {
+					http.Error(w,
+						http.StatusText(http.StatusMethodNotAllowed),
+						http.StatusMethodNotAllowed,
+					)
+				}
+				return
+			}
+		}
+	}
+
+	// Handle 404
+	if a.notFoundHandler != nil {
+		a.notFoundHandler(w, req, nil)
+	} else {
+		http.NotFound(w, req)
+	}
 }
 
 // --------------------------------------------------------------------------------
@@ -465,7 +604,7 @@ func (a *App) DELETE(path string, action Action, middleware ...Middleware) {
 // --------------------------------------------------------------------------------
 
 // AddStaticRewriteRule adds a rewrite rule for a specific statically served path.
-// Make sure to serve the static path with (app).Static(path, root).
+// Make sure to serve the static path with app.Static(path, root).
 func (a *App) AddStaticRewriteRule(path, match string, action RewriteAction) error {
 	expr, err := regexp.Compile(match)
 	if err != nil {
@@ -497,13 +636,13 @@ func (a *App) AddStaticHeader(path, key, value string) {
 // of the Router's NotFound handler.
 // To use the operating system's file system implementation,
 // use http.Dir:
-//     router.ServeFiles("/src/*filepath", http.Dir("/var/www"))
+//     app.Static("/src/*filepath", http.Dir("/var/www"))
 func (a *App) Static(path string, root http.FileSystem) {
 	if len(path) < 10 || path[len(path)-10:] != "/*filepath" {
 		panic("path must end with /*filepath in path '" + path + "'")
 	}
 
-	a.router.GET(path, a.renderAction(a.staticAction(path, root)))
+	a.handle("GET", path, a.renderAction(a.staticAction(path, root)))
 }
 
 // staticAction returns a Action for a given static path and root.
@@ -545,27 +684,23 @@ func (a *App) ViewCache() *ViewCache {
 
 // SetNotFoundHandler sets the not found handler.
 func (a *App) SetNotFoundHandler(handler Action) {
-	a.router.NotFound = newHandleShim(a, handler)
+	a.notFoundHandler = a.renderAction(handler)
 }
 
 // SetMethodNotAllowedHandler sets the not found handler.
 func (a *App) SetMethodNotAllowedHandler(handler Action) {
-	a.router.MethodNotAllowed = newHandleShim(a, handler)
+	a.methodNotAllowedHandler = a.renderAction(handler)
 }
 
 // SetPanicHandler sets the not found handler.
 func (a *App) SetPanicHandler(handler PanicAction) {
-	a.panicHandler = handler
-	a.router.PanicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
+	a.panicAction = handler
+	a.panicHandler = func(w http.ResponseWriter, r *http.Request, err interface{}) {
 		a.renderAction(func(ctx *Ctx) Result {
 			a.fatalWithReq(fmt.Errorf("%v", err), ctx.Request)
 			return handler(ctx, err)
-		})(w, r, httprouter.Params{})
+		})(w, r, nil)
 	}
-}
-
-func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	a.router.ServeHTTP(w, req)
 }
 
 // --------------------------------------------------------------------------------
@@ -638,13 +773,13 @@ func (a *App) Mock() *MockRequestBuilder {
 // Request Pipeline
 // --------------------------------------------------------------------------------
 
-// renderAction is the translation step from Action to httprouter.Handle.
+// renderAction is the translation step from Action to Handler.
 // this is where the bulk of the "pipeline" happens.
-func (a *App) renderAction(action Action) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (a *App) renderAction(action Action) Handler {
+	return func(w http.ResponseWriter, r *http.Request, p RouteParameters) {
 		a.setResponseHeaders(w)
 		response := a.newResponse(w, r)
-		context := a.pipelineInit(response, r, NewRouteParameters(p))
+		context := a.pipelineInit(response, r, p)
 		a.renderResult(action, context)
 		a.pipelineComplete(context)
 	}

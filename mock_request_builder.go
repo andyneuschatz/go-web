@@ -235,11 +235,11 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 		return
 	}
 
-	if mrb.app != nil && mrb.app.panicHandler != nil {
+	if mrb.app != nil && mrb.app.panicAction != nil {
 		defer func() {
 			if r := recover(); r != nil {
 				rc, _ := mrb.Ctx(nil)
-				controllerResult := mrb.app.panicHandler(rc, r)
+				controllerResult := mrb.app.panicAction(rc, r)
 				panicRecoveryBuffer := bytes.NewBuffer([]byte{})
 				panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
 				err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
@@ -256,14 +256,14 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 		}()
 	}
 
-	handle, params, addTrailingSlash := mrb.app.router.Lookup(mrb.verb, mrb.path)
+	route, params, addTrailingSlash := mrb.app.lookup(mrb.verb, mrb.path)
 	if addTrailingSlash {
 		mrb.path = mrb.path + "/"
 	}
 
-	handle, params, addTrailingSlash = mrb.app.router.Lookup(mrb.verb, mrb.path)
-	if handle == nil {
-		return nil, exception.Newf("No matching route for path %s `%s`", mrb.verb, mrb.path)
+	route, params, addTrailingSlash = mrb.app.lookup(mrb.verb, mrb.path)
+	if route == nil {
+		return nil, exception.Newf("no matching route for path %s `%s`", mrb.verb, mrb.path)
 	}
 
 	req, err := mrb.Request()
@@ -279,7 +279,7 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 	}
 
 	w := NewMockResponseWriter(buffer)
-	handle(w, req, params)
+	route.Handler(w, req, params)
 	res = &http.Response{
 		Body:          ioutil.NopCloser(bytes.NewBuffer(buffer.Bytes())),
 		ContentLength: int64(w.ContentLength()),

@@ -683,3 +683,8 @@ func (rc *Ctx) Elapsed() time.Duration {
 	}
 	return time.Now().UTC().Sub(rc.requestStart)
 }
+
+// Route returns the original route match for the request.
+func (rc *Ctx) Route() *Route {
+	return nil
+}
