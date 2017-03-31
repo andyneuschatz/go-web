@@ -54,6 +54,30 @@ func TestAppPathParams(t *testing.T) {
 	assert.Equal("foo", params.Get("uuid"))
 }
 
+func TestAppPathParamsForked(t *testing.T) {
+	assert := assert.New(t)
+
+	var route *Route
+	var params RouteParameters
+	app := New()
+	app.GET("/foos/bar/:uuid", func(c *Ctx) Result {
+		route = c.Route()
+		params = c.routeParameters
+		return c.Raw([]byte("ok!"))
+	})
+	app.GET("/foo/:uuid", func(c *Ctx) Result { return nil })
+
+	assert.Nil(app.Mock().Get("/foos/bar/foo").Execute())
+	assert.NotNil(route)
+	assert.Equal("GET", route.Method)
+	assert.Equal("/foos/bar/:uuid", route.Path)
+	assert.NotNil(route.Handler)
+
+	assert.NotNil(params)
+	assert.NotEmpty(params)
+	assert.Equal("foo", params.Get("uuid"))
+}
+
 func TestAppSetDiagnostics(t *testing.T) {
 	assert := assert.New(t)
 
