@@ -17,12 +17,41 @@ func controllerNoOp(_ *Ctx) Result { return nil }
 func TestAppNoDiagnostics(t *testing.T) {
 	assert := assert.New(t)
 
+	var route *Route
 	app := New()
 	app.GET("/", func(c *Ctx) Result {
+		route = c.Route()
 		return c.Raw([]byte("ok!"))
 	})
 
 	assert.Nil(app.Mock().Get("/").Execute())
+	assert.NotNil(route)
+	assert.Equal("GET", route.Method)
+	assert.Equal("/", route.Path)
+	assert.NotNil(route.Handler)
+}
+
+func TestAppPathParams(t *testing.T) {
+	assert := assert.New(t)
+
+	var route *Route
+	var params RouteParameters
+	app := New()
+	app.GET("/:uuid", func(c *Ctx) Result {
+		route = c.Route()
+		params = c.routeParameters
+		return c.Raw([]byte("ok!"))
+	})
+
+	assert.Nil(app.Mock().Get("/foo").Execute())
+	assert.NotNil(route)
+	assert.Equal("GET", route.Method)
+	assert.Equal("/:uuid", route.Path)
+	assert.NotNil(route.Handler)
+
+	assert.NotNil(params)
+	assert.NotEmpty(params)
+	assert.Equal("foo", params.Get("uuid"))
 }
 
 func TestAppSetDiagnostics(t *testing.T) {
@@ -200,7 +229,7 @@ func TestAppDefaultResultProvider(t *testing.T) {
 	app := New()
 	assert.Nil(app.DefaultMiddleware())
 
-	rc := app.newCtx(nil, nil, nil)
+	rc := app.newCtx(nil, nil, nil, nil)
 	assert.Nil(rc.view)
 	assert.NotNil(rc.text, "rc.text should be provided as default")
 	assert.NotNil(rc.defaultResultProvider)
@@ -212,7 +241,7 @@ func TestAppDefaultResultProviderWithDefault(t *testing.T) {
 	app.SetDefaultMiddleware(ViewProviderAsDefault)
 	assert.NotNil(app.DefaultMiddleware())
 
-	rc := app.newCtx(nil, nil, nil)
+	rc := app.newCtx(nil, nil, nil, nil)
 	assert.Nil(rc.view)
 	assert.Nil(rc.api)
 

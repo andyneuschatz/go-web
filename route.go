@@ -3,7 +3,7 @@ package web
 import "net/http"
 
 // Handler is the most basic route handler.
-type Handler func(http.ResponseWriter, *http.Request, RouteParameters)
+type Handler func(http.ResponseWriter, *http.Request, *Route, RouteParameters)
 
 // PanicHandler is a handler for panics that also takes an error.
 type PanicHandler func(http.ResponseWriter, *http.Request, interface{})

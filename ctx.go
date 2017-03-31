@@ -72,6 +72,7 @@ type Ctx struct {
 	tx                    *sql.Tx
 	state                 State
 	routeParameters       RouteParameters
+	route                 *Route
 	statusCode            int
 	contentLength         int
 	requestStart          time.Time
@@ -686,5 +687,5 @@ func (rc *Ctx) Elapsed() time.Duration {
 
 // Route returns the original route match for the request.
 func (rc *Ctx) Route() *Route {
-	return nil
+	return rc.route
 }
