@@ -403,10 +403,10 @@ func (a *App) StartWithServer(server *http.Server) error {
 		server.TLSConfig = &tls.Config{
 			GetCertificate: a.getCertificate,
 		}
-		return server.ListenAndServeTLS("", "")
+		return exception.Wrap(server.ListenAndServeTLS("", ""))
 	}
 
-	return server.ListenAndServe()
+	return exception.Wrap(server.ListenAndServe())
 }
 
 // Register registers a controller with the app's router.
