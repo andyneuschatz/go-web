@@ -375,25 +375,25 @@ func (a *App) commonStartupTasks() error {
 func (a *App) StartWithServer(server *http.Server) error {
 	var err error
 	if a.startDelegate != nil {
-		a.logger.Infof("Startup tasks starting")
+		a.logger.Infof("startup tasks starting")
 		err = a.startDelegate(a)
 		if err != nil {
-			a.logger.Errorf("Startup tasks error: %v", err)
+			a.logger.Fatalf("startup tasks error: %v", err)
 			return err
 		}
-		a.logger.Infof("Startup tasks complete")
+		a.logger.Infof("startup tasks complete")
 	}
 
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.logger.Errorf("Startup tasks error: %v", err)
+		a.logger.Fatalf("common startup tasks error: %v", err)
 		return err
 	}
 
 	if a.logger != nil && a.logger.IsEnabled(logger.EventInfo) {
-		serverProtocol := "HTTP"
+		serverProtocol := "http"
 		if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
-			serverProtocol = "HTTPS (TLS)"
+			serverProtocol = "https (tls)"
 		}
 		a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
 		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
