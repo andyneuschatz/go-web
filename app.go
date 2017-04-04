@@ -373,6 +373,9 @@ func (a *App) commonStartupTasks() error {
 // This lets you configure things like TLS keys and
 // other options.
 func (a *App) StartWithServer(server *http.Server) error {
+	a.logger.OnEvent(EventAppStart, a)
+	defer a.logger.OnEvent(EventAppExit, a)
+
 	var err error
 	if a.startDelegate != nil {
 		a.logger.Infof("startup tasks starting")
@@ -398,6 +401,8 @@ func (a *App) StartWithServer(server *http.Server) error {
 		a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
 		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	}
+
+	a.logger.OnEvent(EventAppStartComplete, a)
 
 	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
 		server.TLSConfig = &tls.Config{

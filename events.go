@@ -14,6 +14,15 @@ const (
 
 	// EventWebRequestPostBody is an aliased event flag.
 	EventWebRequestPostBody = logger.EventWebRequestPostBody
+
+	// EventAppStart fires when the app is starting.
+	EventAppStart = logger.EventFlag("web.app.start")
+
+	// EventAppStartComplete fires after the app has started.
+	EventAppStartComplete = logger.EventFlag("web.app.start.complete")
+
+	// EventAppExit fires when an app exits.
+	EventAppExit = logger.EventFlag("web.app.exit")
 )
 
 // RequestListener is a listener for `EventRequestStart` and `EventRequest` events.
