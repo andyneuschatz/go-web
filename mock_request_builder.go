@@ -292,6 +292,10 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 	if err != nil {
 		return
 	}
+	if route == nil {
+		err = exception.Newf("No route registered for %s %s", mrb.verb, mrb.path)
+		return
+	}
 
 	w := NewMockResponseWriter(buffer)
 	route.Handler(w, req, route, params)
