@@ -47,6 +47,7 @@ func New() *App {
 		auth:                  NewAuthManager(),
 		viewCache:             NewViewCache(),
 		readTimeout:           5 * time.Second,
+		tlsConfig:             &tls.Config{},
 		redirectTrailingSlash: true,
 	}
 }
@@ -62,10 +63,9 @@ type App struct {
 	port     string
 
 	logger *logger.Agent
-	config interface{}
 
-	tlsCert        *tls.Certificate
-	clientCertPool *x509.CertPool
+	listenTLS bool
+	tlsConfig *tls.Config
 
 	startDelegate AppStartDelegate
 
@@ -144,7 +144,8 @@ func (a *App) UseTLS(tlsCert, tlsKey []byte) error {
 	if err != nil {
 		return err
 	}
-	a.tlsCert = &cert
+	a.tlsConfig.Certificates = []tls.Certificate{cert}
+	a.listenTLS = true
 	a.auth.SetCookieAsSecure(true)
 	return nil
 }
@@ -179,17 +180,24 @@ func (a *App) UseTLSFromEnvironment() error {
 	return nil
 }
 
-// UseClientCertPoolFromCerts set the client cert pool from a given pem.
-func (a *App) UseClientCertPoolFromCerts(certs ...[]byte) error {
-	certPool := x509.NewCertPool()
+// UseTLSClientCertPoolFromCerts set the client cert pool from a given pem.
+func (a *App) UseTLSClientCertPoolFromCerts(certs ...[]byte) error {
+	if a.tlsConfig.ClientCAs == nil {
+		a.tlsConfig.ClientCAs = x509.NewCertPool()
+	}
 	for _, cert := range certs {
-		ok := certPool.AppendCertsFromPEM(cert)
+		ok := a.tlsConfig.ClientCAs.AppendCertsFromPEM(cert)
 		if !ok {
 			return exception.New("invalid ca cert for client cert pool")
 		}
 	}
-	a.clientCertPool = certPool
+	a.tlsConfig.BuildNameToCertificate()
 	return nil
+}
+
+// SetTLSClientCertVerification sets the verification level for client certs.
+func (a *App) SetTLSClientCertVerification(verification tls.ClientAuthType) {
+	a.tlsConfig.ClientAuth = verification
 }
 
 // Logger returns the diagnostics agent for the app.
@@ -208,16 +216,6 @@ func (a *App) SetLogger(agent *logger.Agent) {
 	}
 }
 
-// Config returns the app config object.
-func (a *App) Config() interface{} {
-	return a.config
-}
-
-// SetConfig sets the app config object.
-func (a *App) SetConfig(config interface{}) {
-	a.config = config
-}
-
 // Auth returns the session manager.
 func (a *App) Auth() *AuthManager {
 	return a.auth
@@ -226,73 +224,6 @@ func (a *App) Auth() *AuthManager {
 // SetAuth sets the session manager.
 func (a *App) SetAuth(auth *AuthManager) {
 	a.auth = auth
-}
-
-// InitializeConfig reads a config prototype from the environment.
-func (a *App) InitializeConfig(configPrototype interface{}) error {
-	config, err := ReadConfigFromEnvironment(configPrototype)
-	if err != nil {
-		return err
-	}
-	a.config = config
-	return nil
-}
-
-func (a *App) onRequestStart(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-	if len(state) < 1 {
-		return
-	}
-	context, isContext := state[0].(*Ctx)
-	if !isContext {
-		return
-	}
-	logger.WriteRequestStart(writer, ts, context.Request)
-}
-
-func (a *App) onRequestPostBody(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-	if len(state) < 1 {
-		return
-	}
-
-	body, isBody := state[0].([]byte)
-	if !isBody {
-		return
-	}
-
-	logger.WriteRequestBody(writer, ts, body)
-}
-
-func (a *App) onRequestComplete(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-	if len(state) < 1 {
-		return
-	}
-	context, isContext := state[0].(*Ctx)
-	if !isContext {
-		return
-	}
-	logger.WriteRequest(writer, ts, context.Request, context.Response.StatusCode(), context.Response.ContentLength(), context.Elapsed())
-}
-
-func (a *App) onResponse(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
-	if len(state) < 1 {
-		return
-	}
-	body, stateIsBody := state[0].([]byte)
-	if !stateIsBody {
-		return
-	}
-	logger.WriteResponseBody(writer, ts, body)
-}
-
-// IsolateTo sets the app to use a transaction for *all* requests.
-// Caveat: only use during testing.
-func (a *App) IsolateTo(tx *sql.Tx) {
-	a.tx = tx
-}
-
-// Tx returns the isolated transaction.
-func (a *App) Tx() *sql.Tx {
-	return a.tx
 }
 
 // SetPort sets the port the app listens on.
@@ -371,10 +302,6 @@ func (a *App) Start() error {
 	return a.StartWithServer(a.Server())
 }
 
-func (a *App) getCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	return a.tlsCert, nil
-}
-
 func (a *App) commonStartupTasks() error {
 	return a.viewCache.Initialize()
 }
@@ -388,23 +315,25 @@ func (a *App) StartWithServer(server *http.Server) error {
 
 	var err error
 	if a.startDelegate != nil {
-		a.logger.Infof("startup tasks starting")
+		a.logger.Infof("app startup tasks starting")
 		err = a.startDelegate(a)
 		if err != nil {
-			a.logger.Fatalf("startup tasks error: %v", err)
+			a.logger.Fatalf("app startup tasks error: %v", err)
 			return err
 		}
-		a.logger.Infof("startup tasks complete")
+		a.logger.Infof("app startup tasks complete")
 	}
 
+	a.logger.Infof("app startup tasks starting")
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.logger.Fatalf("common startup tasks error: %v", err)
+		a.logger.Fatalf("app common startup tasks error: %v", err)
 		return err
 	}
+	a.logger.Infof("app startup tasks complete")
 
 	serverProtocol := "http"
-	if a.tlsCert != nil {
+	if a.listenTLS {
 		serverProtocol = "https (tls)"
 	}
 
@@ -412,16 +341,11 @@ func (a *App) StartWithServer(server *http.Server) error {
 	a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	a.logger.OnEvent(EventAppStartComplete, a)
 
-	if a.tlsCert != nil {
-		server.TLSConfig = &tls.Config{
-			GetCertificate: a.getCertificate,
-		}
-		if a.clientCertPool != nil {
-			a.logger.Infof("%s using client cert pool with (%d) client certs", serverProtocol, len(a.clientCertPool.Subjects()))
-			server.TLSConfig.ClientCAs = a.clientCertPool
-			server.TLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
-			server.TLSConfig.BuildNameToCertificate()
-		}
+	if a.tlsConfig.ClientCAs != nil {
+		a.logger.Infof("%s using client cert pool with (%d) client certs", serverProtocol, len(a.tlsConfig.ClientCAs.Subjects()))
+	}
+
+	if a.listenTLS {
 		return exception.Wrap(server.ListenAndServeTLS("", ""))
 	}
 
@@ -433,21 +357,9 @@ func (a *App) Register(c Controller) {
 	c.Register(a)
 }
 
-func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action {
-	finalMiddleware := make([]Middleware, len(middleware)+len(a.defaultMiddleware))
-	cursor := len(finalMiddleware) - 1
-	for i := len(a.defaultMiddleware) - 1; i >= 0; i-- {
-		finalMiddleware[cursor] = a.defaultMiddleware[i]
-		cursor--
-	}
-
-	for i := len(middleware) - 1; i >= 0; i-- {
-		finalMiddleware[cursor] = middleware[i]
-		cursor--
-	}
-
-	return NestMiddleware(action, finalMiddleware...)
-}
+// --------------------------------------------------------------------------------
+// Route Registration / HTTP Methods
+// --------------------------------------------------------------------------------
 
 // GET registers a GET request handler.
 func (a *App) GET(path string, action Action, middleware ...Middleware) {
@@ -484,64 +396,6 @@ func (a *App) DELETE(path string, action Action, middleware ...Middleware) {
 	a.handle("DELETE", path, a.renderAction(a.middlewarePipeline(action, middleware...)))
 }
 
-func (a *App) handle(method, path string, handler Handler) {
-	if len(path) == 0 {
-		panic("path must not be empty")
-	}
-	if path[0] != '/' {
-		panic("path must begin with '/' in path '" + path + "'")
-	}
-	if a.routes == nil {
-		a.routes = make(map[string]*node)
-	}
-
-	root := a.routes[method]
-	if root == nil {
-		root = new(node)
-		a.routes[method] = root
-	}
-
-	root.addRoute(method, path, handler)
-}
-
-func (a *App) allowed(path, reqMethod string) (allow string) {
-	if path == "*" { // server-wide
-		for method := range a.routes {
-			if method == "OPTIONS" {
-				continue
-			}
-
-			// add request method to list of allowed methods
-			if len(allow) == 0 {
-				allow = method
-			} else {
-				allow += ", " + method
-			}
-		}
-		return
-	}
-	for method := range a.routes {
-		// Skip the requested method - we already tried this one
-		if method == reqMethod || method == "OPTIONS" {
-			continue
-		}
-
-		handle, _, _ := a.routes[method].getValue(path)
-		if handle != nil {
-			// add request method to list of allowed methods
-			if len(allow) == 0 {
-				allow = method
-			} else {
-				allow += ", " + method
-			}
-		}
-	}
-	if len(allow) > 0 {
-		allow += ", OPTIONS"
-	}
-	return
-}
-
 // Lookup finds the route data for a given method and path.
 func (a *App) Lookup(method, path string) (route *Route, params RouteParameters, slashRedirect bool) {
 	if root := a.routes[method]; root != nil {
@@ -550,16 +404,10 @@ func (a *App) Lookup(method, path string) (route *Route, params RouteParameters,
 	return nil, nil, false
 }
 
-func (a *App) recv(w http.ResponseWriter, req *http.Request) {
-	if rcv := recover(); rcv != nil {
-		a.panicHandler(w, req, rcv)
-	}
-}
-
 // ServeHTTP makes the router implement the http.Handler interface.
 func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if a.panicHandler != nil {
-		defer a.recv(w, req)
+		defer a.recover(w, req)
 	}
 
 	path := req.URL.Path
@@ -666,34 +514,6 @@ func (a *App) Static(path string, root http.FileSystem) {
 	a.handle("GET", path, a.renderAction(a.staticAction(path, root)))
 }
 
-// staticAction returns a Action for a given static path and root.
-func (a *App) staticAction(path string, root http.FileSystem) Action {
-	fileServer := http.FileServer(root)
-
-	return func(ctx *Ctx) Result {
-
-		var staticRewriteRules []*RewriteRule
-		var staticHeaders http.Header
-
-		if rules, hasRules := a.staticRewriteRules[path]; hasRules {
-			staticRewriteRules = rules
-		}
-
-		if headers, hasHeaders := a.staticHeaders[path]; hasHeaders {
-			staticHeaders = headers
-		}
-
-		filePath, _ := ctx.RouteParam("filepath")
-
-		return &StaticResult{
-			FilePath:     filePath,
-			FileServer:   fileServer,
-			RewriteRules: staticRewriteRules,
-			Headers:      staticHeaders,
-		}
-	}
-}
-
 // ViewCache returns the view result provider.
 func (a *App) ViewCache() *ViewCache {
 	return a.viewCache
@@ -733,9 +553,66 @@ func (a *App) Mock() *MockRequestBuilder {
 	return NewMockRequestBuilder(a)
 }
 
+// IsolateTo sets the app to use a transaction for *all* requests.
+// Caveat: only use during testing.
+func (a *App) IsolateTo(tx *sql.Tx) {
+	a.tx = tx
+}
+
+// Tx returns the isolated transaction.
+func (a *App) Tx() *sql.Tx {
+	return a.tx
+}
+
 // --------------------------------------------------------------------------------
 // Request Pipeline
 // --------------------------------------------------------------------------------
+
+func (a *App) onRequestStart(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	if len(state) < 1 {
+		return
+	}
+	context, isContext := state[0].(*Ctx)
+	if !isContext {
+		return
+	}
+	logger.WriteRequestStart(writer, ts, context.Request)
+}
+
+func (a *App) onRequestPostBody(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	if len(state) < 1 {
+		return
+	}
+
+	body, isBody := state[0].([]byte)
+	if !isBody {
+		return
+	}
+
+	logger.WriteRequestBody(writer, ts, body)
+}
+
+func (a *App) onRequestComplete(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	if len(state) < 1 {
+		return
+	}
+	context, isContext := state[0].(*Ctx)
+	if !isContext {
+		return
+	}
+	logger.WriteRequest(writer, ts, context.Request, context.Response.StatusCode(), context.Response.ContentLength(), context.Elapsed())
+}
+
+func (a *App) onResponse(writer logger.Logger, ts logger.TimeSource, eventFlag logger.EventFlag, state ...interface{}) {
+	if len(state) < 1 {
+		return
+	}
+	body, stateIsBody := state[0].([]byte)
+	if !stateIsBody {
+		return
+	}
+	logger.WriteResponseBody(writer, ts, body)
+}
 
 // renderAction is the translation step from Action to Handler.
 // this is where the bulk of the "pipeline" happens.
@@ -793,7 +670,6 @@ func (a *App) newCtx(w ResponseWriter, r *http.Request, route *Route, p RoutePar
 	ctx.auth = a.auth
 	ctx.tx = a.tx
 	ctx.logger = a.logger
-	ctx.config = a.config
 
 	// it is assumed that default middleware will override this at some point.
 	ctx.SetDefaultResultProvider(ctx.Text())
@@ -830,5 +706,113 @@ func (a *App) pipelineComplete(ctx *Ctx) {
 	err = ctx.Response.Close()
 	if err != nil && err != http.ErrBodyNotAllowed {
 		a.logger.Error(err)
+	}
+}
+
+func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action {
+	finalMiddleware := make([]Middleware, len(middleware)+len(a.defaultMiddleware))
+	cursor := len(finalMiddleware) - 1
+	for i := len(a.defaultMiddleware) - 1; i >= 0; i-- {
+		finalMiddleware[cursor] = a.defaultMiddleware[i]
+		cursor--
+	}
+
+	for i := len(middleware) - 1; i >= 0; i-- {
+		finalMiddleware[cursor] = middleware[i]
+		cursor--
+	}
+
+	return NestMiddleware(action, finalMiddleware...)
+}
+
+// staticAction returns a Action for a given static path and root.
+func (a *App) staticAction(path string, root http.FileSystem) Action {
+	fileServer := http.FileServer(root)
+
+	return func(ctx *Ctx) Result {
+
+		var staticRewriteRules []*RewriteRule
+		var staticHeaders http.Header
+
+		if rules, hasRules := a.staticRewriteRules[path]; hasRules {
+			staticRewriteRules = rules
+		}
+
+		if headers, hasHeaders := a.staticHeaders[path]; hasHeaders {
+			staticHeaders = headers
+		}
+
+		filePath, _ := ctx.RouteParam("filepath")
+
+		return &StaticResult{
+			FilePath:     filePath,
+			FileServer:   fileServer,
+			RewriteRules: staticRewriteRules,
+			Headers:      staticHeaders,
+		}
+	}
+}
+
+func (a *App) handle(method, path string, handler Handler) {
+	if len(path) == 0 {
+		panic("path must not be empty")
+	}
+	if path[0] != '/' {
+		panic("path must begin with '/' in path '" + path + "'")
+	}
+	if a.routes == nil {
+		a.routes = make(map[string]*node)
+	}
+
+	root := a.routes[method]
+	if root == nil {
+		root = new(node)
+		a.routes[method] = root
+	}
+
+	root.addRoute(method, path, handler)
+}
+
+func (a *App) allowed(path, reqMethod string) (allow string) {
+	if path == "*" { // server-wide
+		for method := range a.routes {
+			if method == "OPTIONS" {
+				continue
+			}
+
+			// add request method to list of allowed methods
+			if len(allow) == 0 {
+				allow = method
+			} else {
+				allow += ", " + method
+			}
+		}
+		return
+	}
+	for method := range a.routes {
+		// Skip the requested method - we already tried this one
+		if method == reqMethod || method == "OPTIONS" {
+			continue
+		}
+
+		handle, _, _ := a.routes[method].getValue(path)
+		if handle != nil {
+			// add request method to list of allowed methods
+			if len(allow) == 0 {
+				allow = method
+			} else {
+				allow += ", " + method
+			}
+		}
+	}
+	if len(allow) > 0 {
+		allow += ", OPTIONS"
+	}
+	return
+}
+
+func (a *App) recover(w http.ResponseWriter, req *http.Request) {
+	if rcv := recover(); rcv != nil {
+		a.panicHandler(w, req, rcv)
 	}
 }

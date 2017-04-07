@@ -67,7 +67,6 @@ type Ctx struct {
 	defaultResultProvider ResultProvider
 	app                   *App
 	logger                *logger.Agent
-	config                interface{}
 	auth                  *AuthManager
 	tx                    *sql.Tx
 	state                 State

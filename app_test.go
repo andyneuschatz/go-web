@@ -87,15 +87,6 @@ func TestAppSetDiagnostics(t *testing.T) {
 	assert.True(app.Logger().Events().IsAllEnabled())
 }
 
-func TestAppInitializeConfig(t *testing.T) {
-	assert := assert.New(t)
-
-	app := New()
-	err := app.InitializeConfig(&myConfig{})
-	assert.Nil(err)
-	assert.Equal("8080", app.Config().(*myConfig).Port)
-}
-
 func TestAppCtx(t *testing.T) {
 	assert := assert.New(t)
 
