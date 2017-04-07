@@ -2,6 +2,7 @@ package web
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"fmt"
 	"io/ioutil"
@@ -9,7 +10,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	exception "github.com/blendlabs/go-exception"
@@ -44,7 +44,6 @@ func New() *App {
 	return &App{
 		staticRewriteRules:    map[string][]*RewriteRule{},
 		staticHeaders:         map[string]http.Header{},
-		tlsCertLock:           &sync.Mutex{},
 		auth:                  NewAuthManager(),
 		viewCache:             NewViewCache(),
 		readTimeout:           5 * time.Second,
@@ -65,9 +64,8 @@ type App struct {
 	logger *logger.Agent
 	config interface{}
 
-	tlsCertBytes, tlsKeyBytes []byte
-	tlsCertLock               *sync.Mutex
-	tlsCert                   *tls.Certificate
+	tlsCert        *tls.Certificate
+	clientCertPool *x509.CertPool
 
 	startDelegate AppStartDelegate
 
@@ -141,12 +139,29 @@ func (a *App) SetWriteTimeout(writeTimeout time.Duration) {
 }
 
 // UseTLS sets the app to use TLS.
-func (a *App) UseTLS(tlsCert, tlsKey []byte) {
-	a.tlsCertBytes = tlsCert
-	a.tlsKeyBytes = tlsKey
-
-	// this defaults to inferred or true.
+func (a *App) UseTLS(tlsCert, tlsKey []byte) error {
+	cert, err := tls.X509KeyPair(tlsCert, tlsKey)
+	if err != nil {
+		return err
+	}
+	a.tlsCert = &cert
 	a.auth.SetCookieAsSecure(true)
+	return nil
+}
+
+// UseTLSFromFiles reads a tls key pair from a given set of paths.
+func (a *App) UseTLSFromFiles(tlsCertPath, tlsKeyPath string) error {
+	cert, err := ioutil.ReadFile(tlsCertPath)
+	if err != nil {
+		return exception.Wrap(err)
+	}
+
+	key, err := ioutil.ReadFile(tlsKeyPath)
+	if err != nil {
+		return exception.Wrap(err)
+	}
+
+	return a.UseTLS(cert, key)
 }
 
 // UseTLSFromEnvironment reads TLS settings from the environment.
@@ -159,18 +174,21 @@ func (a *App) UseTLSFromEnvironment() error {
 	if len(tlsCert) > 0 && len(tlsKey) > 0 {
 		a.UseTLS([]byte(tlsCert), []byte(tlsKey))
 	} else if len(tlsCertPath) > 0 && len(tlsKeyPath) > 0 {
-		cert, err := ioutil.ReadFile(tlsCertPath)
-		if err != nil {
-			return exception.Wrap(err)
-		}
-
-		key, err := ioutil.ReadFile(tlsKeyPath)
-		if err != nil {
-			return exception.Wrap(err)
-		}
-
-		a.UseTLS(cert, key)
+		return a.UseTLSFromFiles(tlsCertPath, tlsKeyPath)
 	}
+	return nil
+}
+
+// UseClientCertPoolFromCerts set the client cert pool from a given pem.
+func (a *App) UseClientCertPoolFromCerts(certs ...[]byte) error {
+	certPool := x509.NewCertPool()
+	for _, cert := range certs {
+		ok := certPool.AppendCertsFromPEM(cert)
+		if !ok {
+			return exception.New("invalid ca cert for client cert pool")
+		}
+	}
+	a.clientCertPool = certPool
 	return nil
 }
 
@@ -338,7 +356,6 @@ func (a *App) BindAddr() string {
 
 // Server returns the basic http.Server for the app.
 func (a *App) Server() *http.Server {
-
 	return &http.Server{
 		Addr:              a.BindAddr(),
 		Handler:           a,
@@ -355,13 +372,6 @@ func (a *App) Start() error {
 }
 
 func (a *App) getCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
-	if a.tlsCert == nil {
-		tlsCert, err := tls.X509KeyPair(a.tlsCertBytes, a.tlsKeyBytes)
-		if err != nil {
-			return nil, err
-		}
-		a.tlsCert = &tlsCert
-	}
 	return a.tlsCert, nil
 }
 
@@ -393,20 +403,24 @@ func (a *App) StartWithServer(server *http.Server) error {
 		return err
 	}
 
-	if a.logger != nil && a.logger.IsEnabled(logger.EventInfo) {
-		serverProtocol := "http"
-		if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
-			serverProtocol = "https (tls)"
-		}
-		a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
-		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
+	serverProtocol := "http"
+	if a.tlsCert != nil {
+		serverProtocol = "https (tls)"
 	}
 
+	a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
+	a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	a.logger.OnEvent(EventAppStartComplete, a)
 
-	if len(a.tlsCertBytes) > 0 && len(a.tlsKeyBytes) > 0 {
+	if a.tlsCert != nil {
 		server.TLSConfig = &tls.Config{
 			GetCertificate: a.getCertificate,
+		}
+		if a.clientCertPool != nil {
+			a.logger.Infof("%s using client cert pool with (%d) client certs", serverProtocol, len(a.clientCertPool.Subjects()))
+			server.TLSConfig.ClientCAs = a.clientCertPool
+			server.TLSConfig.ClientAuth = tls.RequireAndVerifyClientCert
+			server.TLSConfig.BuildNameToCertificate()
 		}
 		return exception.Wrap(server.ListenAndServeTLS("", ""))
 	}
