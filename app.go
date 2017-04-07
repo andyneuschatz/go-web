@@ -49,6 +49,7 @@ func New() *App {
 		readTimeout:           5 * time.Second,
 		tlsConfig:             &tls.Config{},
 		redirectTrailingSlash: true,
+		ctxPool:               NewCtxPool(256),
 	}
 }
 
@@ -89,6 +90,8 @@ type App struct {
 	readHeaderTimeout time.Duration
 	writeTimeout      time.Duration
 	idleTimeout       time.Duration
+
+	ctxPool *CtxPool
 
 	auth *AuthManager
 
@@ -294,6 +297,7 @@ func (a *App) Server() *http.Server {
 		ReadHeaderTimeout: a.readHeaderTimeout,
 		WriteTimeout:      a.writeTimeout,
 		IdleTimeout:       a.idleTimeout,
+		TLSConfig:         a.tlsConfig,
 	}
 }
 
@@ -664,15 +668,18 @@ func (a *App) pipelineInit(w ResponseWriter, r *http.Request, route *Route, p Ro
 
 // Ctx creates a context.
 func (a *App) newCtx(w ResponseWriter, r *http.Request, route *Route, p RouteParameters) *Ctx {
-	ctx := NewCtx(w, r, p)
+	ctx := a.ctxPool.Get()
+	ctx.Response = w
+	ctx.Request = r
+	ctx.routeParameters = p
+
 	ctx.app = a
 	ctx.route = route
 	ctx.auth = a.auth
 	ctx.tx = a.tx
 	ctx.logger = a.logger
 
-	// it is assumed that default middleware will override this at some point.
-	ctx.SetDefaultResultProvider(ctx.Text())
+	ctx.defaultResultProvider = ctx.Text()
 
 	return ctx
 }

@@ -26,16 +26,6 @@ const (
 	StringEmpty = ""
 )
 
-// PostedFile is a file that has been posted to an hc endpoint.
-type PostedFile struct {
-	Key      string
-	FileName string
-	Contents []byte
-}
-
-// State is the collection of state objects on a context.
-type State map[string]interface{}
-
 // NewCtx returns a new hc context.
 func NewCtx(w ResponseWriter, r *http.Request, p RouteParameters) *Ctx {
 	ctx := &Ctx{
@@ -54,30 +44,31 @@ type Ctx struct {
 	Response ResponseWriter
 	Request  *http.Request
 
+	app    *App
+	logger *logger.Agent
+	auth   *AuthManager
+
 	postBody []byte
 
 	//Private fields
-	view *ViewResultProvider
-	api  *APIResultProvider
-
-	json *JSONResultProvider
-	xml  *XMLResultProvider
-
+	view                  *ViewResultProvider
+	api                   *APIResultProvider
+	json                  *JSONResultProvider
+	xml                   *XMLResultProvider
 	text                  *TextResultProvider
 	defaultResultProvider ResultProvider
-	app                   *App
-	logger                *logger.Agent
-	auth                  *AuthManager
-	tx                    *sql.Tx
-	state                 State
-	routeParameters       RouteParameters
-	route                 *Route
-	statusCode            int
-	contentLength         int
-	requestStart          time.Time
-	requestEnd            time.Time
-	requestLogFormat      string
-	session               *Session
+
+	state            State
+	routeParameters  RouteParameters
+	route            *Route
+	statusCode       int
+	contentLength    int
+	requestStart     time.Time
+	requestEnd       time.Time
+	requestLogFormat string
+	session          *Session
+
+	tx *sql.Tx
 }
 
 // IsolateTo isolates a request context to a transaction.
@@ -113,30 +104,6 @@ func (rc *Ctx) Session() *Session {
 // SetSession sets the session for the request.
 func (rc *Ctx) SetSession(session *Session) {
 	rc.session = session
-}
-
-// TxBegin either returns the existing (testing) transaction on the request, or calls the provider.
-func (rc *Ctx) TxBegin(provider func() (*sql.Tx, error)) (*sql.Tx, error) {
-	if rc.tx != nil {
-		return rc.tx, nil
-	}
-	return provider()
-}
-
-// TxCommit will call the committer if the request context is not isolated to a transaction already.
-func (rc *Ctx) TxCommit(commiter func() error) error {
-	if rc.tx != nil {
-		return nil
-	}
-	return commiter()
-}
-
-// TxRollback will call the rollbacker if the request context is not isolated to a transaction already.
-func (rc *Ctx) TxRollback(rollbacker func() error) error {
-	if rc.tx != nil {
-		return nil
-	}
-	return rollbacker()
 }
 
 // View returns the view result provider.
@@ -689,3 +656,29 @@ func (rc *Ctx) Elapsed() time.Duration {
 func (rc *Ctx) Route() *Route {
 	return rc.route
 }
+
+// Reset resets the context after handling a request.
+func (rc *Ctx) Reset() {
+	rc.Request = nil
+	rc.Response = nil
+	rc.postBody = nil
+	rc.route = nil
+	rc.routeParameters = nil
+	rc.session = nil
+	rc.state = nil
+	rc.statusCode = 0
+	rc.contentLength = 0
+	rc.requestStart = time.Time{}
+	rc.requestEnd = time.Time{}
+	rc.tx = nil
+}
+
+// PostedFile is a file that has been posted to an hc endpoint.
+type PostedFile struct {
+	Key      string
+	FileName string
+	Contents []byte
+}
+
+// State is the collection of state objects on a context.
+type State map[string]interface{}
