@@ -328,13 +328,13 @@ func (a *App) StartWithServer(server *http.Server) error {
 		a.logger.Infof("app startup tasks complete")
 	}
 
-	a.logger.Infof("app startup tasks starting")
+	a.logger.Infof("common tasks starting")
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.logger.Fatalf("app common startup tasks error: %v", err)
+		a.logger.Fatalf("common startup tasks error: %v", err)
 		return err
 	}
-	a.logger.Infof("app startup tasks complete")
+	a.logger.Infof("common startup tasks complete")
 
 	serverProtocol := "http"
 	if a.listenTLS {
