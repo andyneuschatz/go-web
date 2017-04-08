@@ -1,7 +1,6 @@
 package web
 
 import (
-	"database/sql"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	logger "github.com/blendlabs/go-logger"
+	"github.com/blendlabs/spiffy"
 )
 
 const (
@@ -68,18 +68,18 @@ type Ctx struct {
 	requestLogFormat string
 	session          *Session
 
-	tx *sql.Tx
+	db *spiffy.DB
 }
 
-// IsolateTo isolates a request context to a transaction.
-func (rc *Ctx) IsolateTo(tx *sql.Tx) *Ctx {
-	rc.tx = tx
+// WithDB sets the db for the request context.
+func (rc *Ctx) WithDB(db *spiffy.DB) *Ctx {
+	rc.db = db
 	return rc
 }
 
-// Tx returns the transaction a request context may or may not be isolated to.
-func (rc *Ctx) Tx() *sql.Tx {
-	return rc.tx
+// DB returns the
+func (rc *Ctx) DB() *spiffy.DB {
+	return rc.db
 }
 
 // Auth returns the AuthManager for the request.
@@ -670,7 +670,7 @@ func (rc *Ctx) Reset() {
 	rc.contentLength = 0
 	rc.requestStart = time.Time{}
 	rc.requestEnd = time.Time{}
-	rc.tx = nil
+	rc.db = nil
 }
 
 // PostedFile is a file that has been posted to an hc endpoint.

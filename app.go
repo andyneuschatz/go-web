@@ -3,7 +3,6 @@ package web
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -94,8 +93,6 @@ type App struct {
 	ctxPool *CtxPool
 
 	auth *AuthManager
-
-	tx *sql.Tx
 }
 
 // Name returns the app name.
@@ -149,7 +146,7 @@ func (a *App) UseTLS(tlsCert, tlsKey []byte) error {
 	}
 	a.tlsConfig.Certificates = []tls.Certificate{cert}
 	a.listenTLS = true
-	a.auth.SetCookieAsSecure(true)
+	a.auth.SetCookieAsHTTPSOnly(true)
 	return nil
 }
 
@@ -557,17 +554,6 @@ func (a *App) Mock() *MockRequestBuilder {
 	return NewMockRequestBuilder(a)
 }
 
-// IsolateTo sets the app to use a transaction for *all* requests.
-// Caveat: only use during testing.
-func (a *App) IsolateTo(tx *sql.Tx) {
-	a.tx = tx
-}
-
-// Tx returns the isolated transaction.
-func (a *App) Tx() *sql.Tx {
-	return a.tx
-}
-
 // --------------------------------------------------------------------------------
 // Request Pipeline
 // --------------------------------------------------------------------------------
@@ -677,7 +663,6 @@ func (a *App) newCtx(w ResponseWriter, r *http.Request, route *Route, p RoutePar
 	ctx.app = a
 	ctx.route = route
 	ctx.auth = a.auth
-	ctx.tx = a.tx
 	ctx.logger = a.logger
 
 	ctx.defaultResultProvider = ctx.Text()
@@ -721,7 +706,7 @@ func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action
 	if len(middleware) == 0 && len(a.defaultMiddleware) == 0 {
 		return action
 	}
-	
+
 	finalMiddleware := make([]Middleware, len(middleware)+len(a.defaultMiddleware))
 	cursor := len(finalMiddleware) - 1
 	for i := len(a.defaultMiddleware) - 1; i >= 0; i-- {

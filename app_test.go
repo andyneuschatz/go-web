@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"database/sql"
 	"net/http"
 	"strings"
 	"testing"
@@ -159,24 +158,6 @@ func TestAppMiddleWarePipeline(t *testing.T) {
 	assert.Nil(err)
 	assert.True(didRun)
 	assert.Equal("foo", string(result))
-}
-
-func TestAppMockTransactions(t *testing.T) {
-	assert := assert.New(t)
-	app := New()
-
-	tx := &sql.Tx{}
-	app.IsolateTo(tx)
-
-	var action = func(r *Ctx) Result {
-		assert.NotNil(r.Tx())
-		return r.Raw([]byte("OK!"))
-	}
-
-	app.GET("/", action)
-
-	err := app.Mock().WithPathf("/").Execute()
-	assert.Nil(err)
 }
 
 func TestAppStatic(t *testing.T) {

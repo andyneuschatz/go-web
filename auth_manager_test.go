@@ -1,10 +1,10 @@
 package web
 
 import (
-	"database/sql"
 	"testing"
 
 	assert "github.com/blendlabs/go-assert"
+	"github.com/blendlabs/spiffy"
 )
 
 func TestAuthManagerLogin(t *testing.T) {
@@ -13,11 +13,37 @@ func TestAuthManagerLogin(t *testing.T) {
 	app := New()
 	rc, _ := app.Mock().Ctx(nil)
 
-	sm := NewAuthManager()
-	session, err := sm.Login(1, rc)
+	am := NewAuthManager()
+	session, err := am.Login(1, rc)
 	assert.Nil(err)
 
-	valid, err := sm.VerifySession(session.SessionID, nil)
+	rc2, err := app.Mock().WithHeader(am.SessionParamName(), session.SessionID).Ctx(nil)
+	assert.Nil(err)
+
+	valid, err := am.VerifySession(rc2)
+	assert.Nil(err)
+	assert.NotNil(valid)
+	assert.Equal(1, valid.UserID)
+}
+
+func TestAuthManagerLoginSecure(t *testing.T) {
+	assert := assert.New(t)
+
+	app := New()
+	rc, _ := app.Mock().Ctx(nil)
+
+	am := NewAuthManager()
+	am.SetSecret(GenerateSHA512Key())
+	session, err := am.Login(1, rc)
+	assert.Nil(err)
+
+	secureSessionID, err := EncodeSignSessionID(session.SessionID, am.Secret())
+	assert.Nil(err)
+
+	rc2, err := app.Mock().WithHeader(am.SessionParamName(), session.SessionID).WithHeader(am.SecureSessionParamName(), secureSessionID).Ctx(nil)
+	assert.Nil(err)
+
+	valid, err := am.VerifySession(rc2)
 	assert.Nil(err)
 	assert.NotNil(valid)
 	assert.Equal(1, valid.UserID)
@@ -32,67 +58,61 @@ func TestAuthManagerLoginWithPersist(t *testing.T) {
 	rc, _ := app.Mock().Ctx(nil)
 
 	didCallPersist := false
-	sm := NewAuthManager()
-	sm.SetPersistHandler(func(c *Ctx, s *Session, tx *sql.Tx) error {
+	am := NewAuthManager()
+	am.SetPersistHandler(func(c *Ctx, s *Session, db *spiffy.DB) error {
 		didCallPersist = true
 		sessions[s.SessionID] = s
 		return nil
 	})
 
-	session, err := sm.Login(1, rc)
+	session, err := am.Login(1, rc)
 	assert.Nil(err)
 	assert.True(didCallPersist)
 
-	sm2 := NewAuthManager()
-	sm2.SetFetchHandler(func(sid string, tx *sql.Tx) (*Session, error) {
+	am2 := NewAuthManager()
+	am2.SetFetchHandler(func(sid string, db *spiffy.DB) (*Session, error) {
 		return sessions[sid], nil
 	})
 
-	valid, err := sm2.VerifySession(session.SessionID, nil)
+	rc2, err := app.Mock().WithHeader(am.SessionParamName(), session.SessionID).Ctx(nil)
+	assert.Nil(err)
+
+	valid, err := am2.VerifySession(rc2)
 	assert.Nil(err)
 	assert.NotNil(valid)
 	assert.Equal(1, valid.UserID)
 }
 
-func TestAuthManagerVerifySession(t *testing.T) {
-	assert := assert.New(t)
-
-	sm := NewAuthManager()
-	sessionID := NewSessionID()
-	sm.sessionCache.Add(NewSession(1, sessionID))
-
-	valid, err := sm.VerifySession(sessionID, nil)
-	assert.Nil(err)
-	assert.Equal(sessionID, valid.SessionID)
-	assert.Equal(1, valid.UserID)
-
-	invalid, err := sm.VerifySession(NewSessionID(), nil)
-	assert.Nil(err) // we do not return an error on miss if no fetch handler is configured.
-	assert.Nil(invalid)
-}
-
 func TestAuthManagerVerifySessionWithFetch(t *testing.T) {
 	assert := assert.New(t)
+
+	app := New()
 
 	sessions := map[string]*Session{}
 
 	didCallHandler := false
 
-	sm := NewAuthManager()
-	sm.SetFetchHandler(func(sessionID string, tx *sql.Tx) (*Session, error) {
+	am := NewAuthManager()
+	am.SetFetchHandler(func(sessionID string, db *spiffy.DB) (*Session, error) {
 		didCallHandler = true
 		return sessions[sessionID], nil
 	})
 	sessionID := NewSessionID()
 	sessions[sessionID] = NewSession(1, sessionID)
 
-	valid, err := sm.VerifySession(sessionID, nil)
+	rc2, err := app.Mock().WithHeader(am.SessionParamName(), sessionID).Ctx(nil)
+	assert.Nil(err)
+
+	valid, err := am.VerifySession(rc2)
 	assert.Nil(err)
 	assert.Equal(sessionID, valid.SessionID)
 	assert.Equal(1, valid.UserID)
 	assert.True(didCallHandler)
 
-	invalid, err := sm.VerifySession(NewSessionID(), nil)
+	rc3, err := app.Mock().WithHeader(am.SessionParamName(), NewSessionID()).Ctx(nil)
+	assert.Nil(err)
+
+	invalid, err := am.VerifySession(rc3)
 	assert.Nil(err)
 	assert.Nil(invalid)
 }
@@ -100,9 +120,9 @@ func TestAuthManagerVerifySessionWithFetch(t *testing.T) {
 func TestAuthManagerIsCookieSecure(t *testing.T) {
 	assert := assert.New(t)
 	sm := NewAuthManager()
-	assert.False(sm.IsCookieSecure())
-	sm.SetCookieAsSecure(true)
-	assert.True(sm.IsCookieSecure())
-	sm.SetCookieAsSecure(false)
-	assert.False(sm.IsCookieSecure())
+	assert.False(sm.IsCookieHTTPSOnly())
+	sm.SetCookieAsHTTPSOnly(true)
+	assert.True(sm.IsCookieHTTPSOnly())
+	sm.SetCookieAsHTTPSOnly(false)
+	assert.False(sm.IsCookieHTTPSOnly())
 }
