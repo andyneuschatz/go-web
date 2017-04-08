@@ -718,6 +718,10 @@ func (a *App) pipelineComplete(ctx *Ctx) {
 }
 
 func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action {
+	if len(middleware) == 0 && len(a.defaultMiddleware) == 0 {
+		return action
+	}
+	
 	finalMiddleware := make([]Middleware, len(middleware)+len(a.defaultMiddleware))
 	cursor := len(finalMiddleware) - 1
 	for i := len(a.defaultMiddleware) - 1; i >= 0; i-- {
