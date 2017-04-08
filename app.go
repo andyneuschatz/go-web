@@ -627,6 +627,7 @@ func (a *App) renderAction(action Action) Handler {
 		context := a.pipelineInit(response, r, route, p)
 		a.renderResult(action, context)
 		a.pipelineComplete(context)
+		a.ctxPool.Put(context)
 	}
 }
 
