@@ -1,7 +1,10 @@
 package web
 
 import (
+	"fmt"
 	"testing"
+
+	"net/http"
 
 	"github.com/blendlabs/go-assert"
 )
@@ -51,4 +54,24 @@ func TestMockRequestBuilderJSON(t *testing.T) {
 	assert.NotEmpty(res)
 	assert.Equal("foo", res[0])
 	assert.Equal("bar", res[1])
+}
+
+func TestMockRequestBuilderPanicHandler(t *testing.T) {
+	assert := assert.New(t)
+
+	var didPanic bool
+
+	app := New()
+	app.SetPanicHandler(func(r *Ctx, err interface{}) Result {
+		didPanic = true
+		return r.Text().InternalError(fmt.Errorf("%v", err))
+	})
+	app.GET("/test_path", func(r *Ctx) Result {
+		panic("this is only a test")
+	})
+
+	meta, err := app.Mock().Get("/test_path").ExecuteWithMeta()
+	assert.Nil(err)
+	assert.Equal(http.StatusInternalServerError, meta.StatusCode)
+	assert.True(didPanic)
 }

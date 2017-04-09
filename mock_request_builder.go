@@ -260,32 +260,6 @@ func (mrb *MockRequestBuilder) Route() (route *Route, params RouteParameters, er
 	return
 }
 
-func (mrb *MockRequestBuilder) recover(res *http.Response) (err error) {
-	if r := recover(); r != nil {
-
-		rc, _ := mrb.Ctx(nil)
-
-		controllerResult := mrb.app.panicAction(rc, r)
-		panicRecoveryBuffer := bytes.NewBuffer([]byte{})
-
-		panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
-		err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
-
-		panicResponseBytes := panicRecoveryBuffer.Bytes()
-
-		res = &http.Response{
-			Body:          ioutil.NopCloser(bytes.NewBuffer(panicResponseBytes)),
-			ContentLength: int64(panicRecoveryWriter.ContentLength()),
-			Header:        http.Header{},
-			StatusCode:    panicRecoveryWriter.StatusCode(),
-			Proto:         "http",
-			ProtoMajor:    1,
-			ProtoMinor:    1,
-		}
-	}
-	return
-}
-
 // Response runs the mock request.
 func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 	if mrb.err != nil {
@@ -294,7 +268,29 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 	}
 
 	if mrb.app != nil && mrb.app.panicAction != nil {
-		defer func() { err = mrb.recover(res) }()
+		defer func() {
+			if r := recover(); r != nil {
+				rc, _ := mrb.Ctx(nil)
+
+				controllerResult := mrb.app.panicAction(rc, r)
+				panicRecoveryBuffer := bytes.NewBuffer([]byte{})
+
+				panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
+				err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
+
+				panicResponseBytes := panicRecoveryBuffer.Bytes()
+
+				res = &http.Response{
+					Body:          ioutil.NopCloser(bytes.NewBuffer(panicResponseBytes)),
+					ContentLength: int64(panicRecoveryWriter.ContentLength()),
+					Header:        http.Header{},
+					StatusCode:    panicRecoveryWriter.StatusCode(),
+					Proto:         "http",
+					ProtoMajor:    1,
+					ProtoMinor:    1,
+				}
+			}
+		}()
 	}
 
 	req, err := mrb.Request()

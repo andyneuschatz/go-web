@@ -41,14 +41,14 @@ func (trp *TextResultProvider) InternalError(err error) Result {
 
 	if err != nil {
 		return &RawResult{
-			StatusCode:  http.StatusForbidden,
+			StatusCode:  http.StatusInternalServerError,
 			ContentType: ContentTypeText,
 			Body:        []byte(err.Error()),
 		}
 	}
 
 	return &RawResult{
-		StatusCode:  http.StatusForbidden,
+		StatusCode:  http.StatusInternalServerError,
 		ContentType: ContentTypeText,
 		Body:        []byte("An internal server error occurred."),
 	}

@@ -127,14 +127,14 @@ func (am *AuthManager) VerifySession(context *Ctx) (*Session, error) {
 
 	err := am.validateSessionID(sessionID)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 
 	if am.ShouldIssueSecureSesssionID() {
 		secureSessionID := am.readSecureSessionID(context)
 		err := am.validateSecureSessionID(sessionID, secureSessionID)
 		if err != nil {
-			return nil, err
+			return nil, nil
 		}
 	}
 
