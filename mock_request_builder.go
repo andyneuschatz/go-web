@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/blendlabs/go-exception"
+	"github.com/blendlabs/spiffy"
 )
 
 // NewMockRequestBuilder returns a new mock request builder for a given app.
@@ -29,7 +30,7 @@ func NewMockRequestBuilder(app *App) *MockRequestBuilder {
 		queryString: url.Values{},
 		formValues:  url.Values{},
 		headers:     http.Header{},
-		startupErr:  err,
+		err:         err,
 	}
 }
 
@@ -47,9 +48,16 @@ type MockRequestBuilder struct {
 
 	postedFiles map[string]PostedFile
 
-	startupErr error
+	err error
+	db  *spiffy.DB
 
 	responseBuffer *bytes.Buffer
+}
+
+// WithDB injects a db connection into the request context.
+func (mrb *MockRequestBuilder) WithDB(db *spiffy.DB) *MockRequestBuilder {
+	mrb.db = db
+	return mrb
 }
 
 // Get is a shortcut for WithVerb("GET") WithPathf(pathFormat, args...)
@@ -77,6 +85,12 @@ func (mrb *MockRequestBuilder) Delete(pathFormat string, args ...interface{}) *M
 	return mrb.WithVerb("DELETE").WithPathf(pathFormat, args...)
 }
 
+// WithVerb sets the verb for the request.
+func (mrb *MockRequestBuilder) WithVerb(verb string) *MockRequestBuilder {
+	mrb.verb = strings.ToUpper(verb)
+	return mrb
+}
+
 // WithPathf sets the path for the request.
 func (mrb *MockRequestBuilder) WithPathf(pathFormat string, args ...interface{}) *MockRequestBuilder {
 	mrb.path = fmt.Sprintf(pathFormat, args...)
@@ -86,12 +100,6 @@ func (mrb *MockRequestBuilder) WithPathf(pathFormat string, args ...interface{})
 		mrb.path = fmt.Sprintf("/%s", mrb.path)
 	}
 
-	return mrb
-}
-
-// WithVerb sets the verb for the request.
-func (mrb *MockRequestBuilder) WithVerb(verb string) *MockRequestBuilder {
-	mrb.verb = strings.ToUpper(verb)
 	return mrb
 }
 
@@ -220,7 +228,7 @@ func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 	w := NewMockResponseWriter(buffer)
 	var rc *Ctx
 	if mrb.app != nil {
-		route, _, err := mrb.lookup(mrb.verb, mrb.path)
+		route, _, err := mrb.Route()
 		if err != nil {
 			return nil, err
 		}
@@ -229,49 +237,64 @@ func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 		rc = NewCtx(w, r, p)
 	}
 
+	if mrb.db != nil {
+		rc = rc.WithDB(mrb.db)
+	}
+
 	return rc, nil
 }
 
-func (mrb *MockRequestBuilder) lookup(verb, path string) (route *Route, params RouteParameters, err error) {
+// Route returns the corresponding route.
+func (mrb *MockRequestBuilder) Route() (route *Route, params RouteParameters, err error) {
 	var tsr bool
-	route, params, tsr = mrb.app.Lookup(verb, path)
+	path := mrb.path
+	route, params, tsr = mrb.app.Lookup(mrb.verb, path)
 	if tsr {
 		path = path + "/"
-		route, params, tsr = mrb.app.Lookup(verb, path)
+		route, params, tsr = mrb.app.Lookup(mrb.verb, path)
 		if route == nil {
-			err = exception.Newf("no matching route for path %s `%s`", mrb.verb, mrb.path)
+			err = exception.Newf("no matching route for path %s `%s`", mrb.verb, path)
 		}
 	}
 
 	return
 }
 
+func (mrb *MockRequestBuilder) recover(res *http.Response) (err error) {
+	if r := recover(); r != nil {
+
+		rc, _ := mrb.Ctx(nil)
+
+		controllerResult := mrb.app.panicAction(rc, r)
+		panicRecoveryBuffer := bytes.NewBuffer([]byte{})
+
+		panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
+		err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
+
+		panicResponseBytes := panicRecoveryBuffer.Bytes()
+
+		res = &http.Response{
+			Body:          ioutil.NopCloser(bytes.NewBuffer(panicResponseBytes)),
+			ContentLength: int64(panicRecoveryWriter.ContentLength()),
+			Header:        http.Header{},
+			StatusCode:    panicRecoveryWriter.StatusCode(),
+			Proto:         "http",
+			ProtoMajor:    1,
+			ProtoMinor:    1,
+		}
+	}
+	return
+}
+
 // Response runs the mock request.
 func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
-	if mrb.startupErr != nil {
-		err = mrb.startupErr
+	if mrb.err != nil {
+		err = mrb.err
 		return
 	}
 
 	if mrb.app != nil && mrb.app.panicAction != nil {
-		defer func() {
-			if r := recover(); r != nil {
-				rc, _ := mrb.Ctx(nil)
-				controllerResult := mrb.app.panicAction(rc, r)
-				panicRecoveryBuffer := bytes.NewBuffer([]byte{})
-				panicRecoveryWriter := NewMockResponseWriter(panicRecoveryBuffer)
-				err = controllerResult.Render(NewCtx(panicRecoveryWriter, rc.Request, rc.routeParameters))
-				res = &http.Response{
-					Body:          ioutil.NopCloser(bytes.NewBuffer(panicRecoveryBuffer.Bytes())),
-					ContentLength: int64(panicRecoveryWriter.ContentLength()),
-					Header:        http.Header{},
-					StatusCode:    panicRecoveryWriter.StatusCode(),
-					Proto:         "http",
-					ProtoMajor:    1,
-					ProtoMinor:    1,
-				}
-			}
-		}()
+		defer func() { err = mrb.recover(res) }()
 	}
 
 	req, err := mrb.Request()
@@ -288,7 +311,7 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 
 	var route *Route
 	var params RouteParameters
-	route, params, err = mrb.lookup(mrb.verb, mrb.path)
+	route, params, err = mrb.Route()
 	if err != nil {
 		return
 	}
