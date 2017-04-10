@@ -71,6 +71,17 @@ type Ctx struct {
 	db *spiffy.DB
 }
 
+// WithApp sets the app reference for the ctx.
+func (rc *Ctx) WithApp(app *App) *Ctx {
+	rc.app = app
+	return rc
+}
+
+// App returns the app reference.
+func (rc *Ctx) App() *App {
+	return rc.app
+}
+
 // WithDB sets the db for the request context.
 func (rc *Ctx) WithDB(db *spiffy.DB) *Ctx {
 	rc.db = db
@@ -659,6 +670,7 @@ func (rc *Ctx) Route() *Route {
 
 // Reset resets the context after handling a request.
 func (rc *Ctx) Reset() {
+	rc.app = nil
 	rc.Request = nil
 	rc.Response = nil
 	rc.postBody = nil
