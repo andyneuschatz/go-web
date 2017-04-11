@@ -8,7 +8,6 @@ import (
 
 	"github.com/blendlabs/go-assert"
 	"github.com/blendlabs/go-logger"
-	_ "github.com/lib/pq"
 )
 
 func controllerNoOp(_ *Ctx) Result { return nil }
