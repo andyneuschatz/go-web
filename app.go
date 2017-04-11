@@ -48,7 +48,7 @@ func New() *App {
 		readTimeout:           5 * time.Second,
 		tlsConfig:             &tls.Config{},
 		redirectTrailingSlash: true,
-		ctxPool:               NewCtxPool(256),
+		//ctxPool:               NewCtxPool(256),
 	}
 }
 
@@ -90,7 +90,7 @@ type App struct {
 	writeTimeout      time.Duration
 	idleTimeout       time.Duration
 
-	ctxPool *CtxPool
+	//ctxPool *CtxPool
 
 	auth *AuthManager
 }
@@ -615,7 +615,7 @@ func (a *App) renderAction(action Action) Handler {
 		context := a.pipelineInit(response, r, route, p)
 		a.renderResult(action, context)
 		a.pipelineComplete(context)
-		a.ctxPool.Put(context)
+		//a.ctxPool.Put(context)
 	}
 }
 
@@ -657,7 +657,7 @@ func (a *App) pipelineInit(w ResponseWriter, r *http.Request, route *Route, p Ro
 
 // Ctx creates a context.
 func (a *App) newCtx(w ResponseWriter, r *http.Request, route *Route, p RouteParameters) *Ctx {
-	ctx := a.ctxPool.Get()
+	ctx := NewCtx(w, r, p) //a.ctxPool.Get()
 	ctx.Response = w
 	ctx.Request = r
 	ctx.routeParameters = p
@@ -696,12 +696,13 @@ func (a *App) pipelineComplete(ctx *Ctx) {
 		a.logger.OnEvent(logger.EventWebResponse, ctx.Response.Bytes())
 	}
 
-	// effectively "request complete"
-	a.logger.OnEvent(logger.EventWebRequest, ctx)
 	err = ctx.Response.Close()
 	if err != nil && err != http.ErrBodyNotAllowed {
 		a.logger.Error(err)
 	}
+
+	// effectively "request complete"
+	a.logger.OnEvent(logger.EventWebRequest, ctx)
 }
 
 func (a *App) middlewarePipeline(action Action, middleware ...Middleware) Action {
