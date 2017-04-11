@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -14,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/blendlabs/go-exception"
-	"github.com/blendlabs/spiffy"
 )
 
 // NewMockRequestBuilder returns a new mock request builder for a given app.
@@ -49,15 +49,9 @@ type MockRequestBuilder struct {
 	postedFiles map[string]PostedFile
 
 	err error
-	db  *spiffy.DB
 
 	responseBuffer *bytes.Buffer
-}
-
-// WithDB injects a db connection into the request context.
-func (mrb *MockRequestBuilder) WithDB(db *spiffy.DB) *MockRequestBuilder {
-	mrb.db = db
-	return mrb
+	tx             *sql.Tx
 }
 
 // Get is a shortcut for WithVerb("GET") WithPathf(pathFormat, args...)
@@ -155,6 +149,17 @@ func (mrb *MockRequestBuilder) WithResponseBuffer(buffer *bytes.Buffer) *MockReq
 	return mrb
 }
 
+// WithTx sets the transaction for the request.
+func (mrb *MockRequestBuilder) WithTx(tx *sql.Tx) *MockRequestBuilder {
+	mrb.tx = tx
+	return mrb
+}
+
+// Tx returns the transaction for the request.
+func (mrb *MockRequestBuilder) Tx() *sql.Tx {
+	return mrb.tx
+}
+
 // Request returns the mock request builder settings as an http.Request.
 func (mrb *MockRequestBuilder) Request() (*http.Request, error) {
 	req := &http.Request{}
@@ -235,10 +240,6 @@ func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 		rc = mrb.app.newCtx(w, r, route, p)
 	} else {
 		rc = NewCtx(w, r, p)
-	}
-
-	if mrb.db != nil {
-		rc = rc.WithDB(mrb.db)
 	}
 
 	return rc, nil

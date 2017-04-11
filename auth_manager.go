@@ -4,11 +4,10 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
+	"database/sql"
 	"io"
 	"net/url"
 	"time"
-
-	"github.com/blendlabs/spiffy"
 )
 
 const (
@@ -49,10 +48,10 @@ func NewAuthManager() *AuthManager {
 // AuthManager is a manager for sessions.
 type AuthManager struct {
 	sessionCache           *SessionCache
-	persistHandler         func(*Ctx, *Session, *spiffy.DB) error
-	fetchHandler           func(sessionID string, db *spiffy.DB) (*Session, error)
-	removeHandler          func(sessionID string, db *spiffy.DB) error
-	validateHandler        func(*Session, *spiffy.DB) error
+	persistHandler         func(*Ctx, *Session, *sql.Tx) error
+	fetchHandler           func(sessionID string, tx *sql.Tx) (*Session, error)
+	removeHandler          func(sessionID string, tx *sql.Tx) error
+	validateHandler        func(*Session, *sql.Tx) error
 	loginRedirectHandler   func(*url.URL) *url.URL
 	sessionParamName       string
 	secureSessionParamName string
@@ -84,7 +83,7 @@ func (am *AuthManager) Login(userID int64, context *Ctx) (session *Session, err 
 
 	session = NewSession(userID, sessionID)
 	if am.persistHandler != nil {
-		err = am.persistHandler(context, session, context.DB())
+		err = am.persistHandler(context, session, context.Tx())
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +113,7 @@ func (am *AuthManager) Logout(session *Session, context *Ctx) error {
 	}
 	if am.removeHandler != nil {
 		if context != nil {
-			return am.removeHandler(session.SessionID, context.DB())
+			return am.removeHandler(session.SessionID, context.Tx())
 		}
 		return am.removeHandler(session.SessionID, nil)
 	}
@@ -151,7 +150,7 @@ func (am *AuthManager) VerifySession(context *Ctx) (*Session, error) {
 
 	var session *Session
 	if context != nil {
-		session, err = am.fetchHandler(sessionID, context.DB())
+		session, err = am.fetchHandler(sessionID, context.Tx())
 	} else {
 		session, err = am.fetchHandler(sessionID, nil)
 	}
@@ -170,9 +169,9 @@ func (am *AuthManager) VerifySession(context *Ctx) (*Session, error) {
 
 	if am.validateHandler != nil {
 		if context != nil {
-			err = am.validateHandler(session, context.DB())
+			err = am.validateHandler(session, context.Tx())
 		} else {
-			err = am.validateHandler(session, context.DB())
+			err = am.validateHandler(session, context.Tx())
 		}
 		if err != nil {
 			return nil, err
@@ -253,22 +252,22 @@ func (am *AuthManager) SessionParamName() string {
 }
 
 // SetPersistHandler sets the persist handler
-func (am *AuthManager) SetPersistHandler(handler func(*Ctx, *Session, *spiffy.DB) error) {
+func (am *AuthManager) SetPersistHandler(handler func(*Ctx, *Session, *sql.Tx) error) {
 	am.persistHandler = handler
 }
 
 // SetFetchHandler sets the fetch handler
-func (am *AuthManager) SetFetchHandler(handler func(sessionID string, tx *spiffy.DB) (*Session, error)) {
+func (am *AuthManager) SetFetchHandler(handler func(sessionID string, tx *sql.Tx) (*Session, error)) {
 	am.fetchHandler = handler
 }
 
 // SetRemoveHandler sets the remove handler.
-func (am *AuthManager) SetRemoveHandler(handler func(sessionID string, tx *spiffy.DB) error) {
+func (am *AuthManager) SetRemoveHandler(handler func(sessionID string, tx *sql.Tx) error) {
 	am.removeHandler = handler
 }
 
 // SetValidateHandler sets the validate handler.
-func (am *AuthManager) SetValidateHandler(handler func(*Session, *spiffy.DB) error) {
+func (am *AuthManager) SetValidateHandler(handler func(*Session, *sql.Tx) error) {
 	am.validateHandler = handler
 }
 

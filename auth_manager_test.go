@@ -1,10 +1,10 @@
 package web
 
 import (
+	"database/sql"
 	"testing"
 
 	assert "github.com/blendlabs/go-assert"
-	"github.com/blendlabs/spiffy"
 )
 
 func TestAuthManagerLogin(t *testing.T) {
@@ -59,7 +59,7 @@ func TestAuthManagerLoginWithPersist(t *testing.T) {
 
 	didCallPersist := false
 	am := NewAuthManager()
-	am.SetPersistHandler(func(c *Ctx, s *Session, db *spiffy.DB) error {
+	am.SetPersistHandler(func(c *Ctx, s *Session, tx *sql.Tx) error {
 		didCallPersist = true
 		sessions[s.SessionID] = s
 		return nil
@@ -70,7 +70,7 @@ func TestAuthManagerLoginWithPersist(t *testing.T) {
 	assert.True(didCallPersist)
 
 	am2 := NewAuthManager()
-	am2.SetFetchHandler(func(sid string, db *spiffy.DB) (*Session, error) {
+	am2.SetFetchHandler(func(sid string, tx *sql.Tx) (*Session, error) {
 		return sessions[sid], nil
 	})
 
@@ -93,7 +93,7 @@ func TestAuthManagerVerifySessionWithFetch(t *testing.T) {
 	didCallHandler := false
 
 	am := NewAuthManager()
-	am.SetFetchHandler(func(sessionID string, db *spiffy.DB) (*Session, error) {
+	am.SetFetchHandler(func(sessionID string, tx *sql.Tx) (*Session, error) {
 		didCallHandler = true
 		return sessions[sessionID], nil
 	})
