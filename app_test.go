@@ -281,3 +281,22 @@ func TestAppViewResult(t *testing.T) {
 	assert.Equal(ContentTypeHTML, meta.Headers.Get(HeaderContentType))
 	assert.Contains("foobarbaz", string(res))
 }
+
+func TestAppWritesLogs(t *testing.T) {
+	assert := assert.New(t)
+
+	buffer := bytes.NewBuffer(nil)
+	agent := logger.New(logger.NewEventFlagSetAll(), logger.NewLogWriter(buffer))
+
+	app := New()
+	app.SetLogger(agent)
+	app.GET("/", func(r *Ctx) Result {
+		return r.Raw([]byte("ok!"))
+	})
+	err := app.Mock().Get("/").Execute()
+	assert.Nil(err)
+	assert.Nil(agent.Drain())
+
+	assert.NotZero(buffer.Len())
+	assert.NotEmpty(buffer.String())
+}

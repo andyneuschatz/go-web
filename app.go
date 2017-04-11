@@ -339,7 +339,9 @@ func (a *App) StartWithServer(server *http.Server) error {
 	}
 
 	a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
-	a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
+	if a.logger.Events() != nil {
+		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
+	}
 	a.logger.OnEvent(EventAppStartComplete, a)
 
 	if a.tlsConfig.ClientCAs != nil {
