@@ -323,36 +323,36 @@ func (a *App) StartWithServer(server *http.Server) error {
 
 	var err error
 	if a.startDelegate != nil {
-		a.logger.Infof("app startup tasks starting")
+		a.logger.Sync().Infof("app startup tasks starting")
 		err = a.startDelegate(a)
 		if err != nil {
-			a.logger.Fatalf("app startup tasks error: %v", err)
+			a.logger.Sync().Fatalf("app startup tasks error: %v", err)
 			return err
 		}
-		a.logger.Infof("app startup tasks complete")
+		a.logger.Sync().Infof("app startup tasks complete")
 	}
 
-	a.logger.Infof("common tasks starting")
+	a.logger.Sync().Infof("common tasks starting")
 	err = a.commonStartupTasks()
 	if err != nil {
-		a.logger.Fatalf("common startup tasks error: %v", err)
+		a.logger.Sync().Fatalf("common startup tasks error: %v", err)
 		return err
 	}
-	a.logger.Infof("common startup tasks complete")
+	a.logger.Sync().Infof("common startup tasks complete")
 
 	serverProtocol := "http"
 	if a.listenTLS {
 		serverProtocol = "https (tls)"
 	}
 
-	a.logger.Infof("%s server started, listening on %s", serverProtocol, server.Addr)
+	a.logger.Sync().Infof("%s server started, listening on %s", serverProtocol, server.Addr)
 	if a.logger.Events() != nil {
-		a.logger.Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
+		a.logger.Sync().Infof("%s server diagnostics verbosity %s", serverProtocol, a.logger.Events().String())
 	}
 	a.logger.OnEvent(EventAppStartComplete, a)
 
 	if a.tlsConfig.ClientCAs != nil {
-		a.logger.Infof("%s using client cert pool with (%d) client certs", serverProtocol, len(a.tlsConfig.ClientCAs.Subjects()))
+		a.logger.Sync().Infof("%s using client cert pool with (%d) client certs", serverProtocol, len(a.tlsConfig.ClientCAs.Subjects()))
 	}
 
 	if a.listenTLS {
