@@ -480,8 +480,8 @@ func (rc *Ctx) WriteCookie(cookie *http.Cookie) {
 }
 
 func (rc *Ctx) getCookieDomain() string {
-	if rc.app != nil && len(rc.app.domain) > 0 {
-		return rc.app.domain
+	if rc.app != nil && rc.app.baseURL != nil {
+		return rc.app.baseURL.Host
 	}
 	return rc.Request.Host
 }

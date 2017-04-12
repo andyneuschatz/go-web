@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"net/url"
+
 	exception "github.com/blendlabs/go-exception"
 	logger "github.com/blendlabs/go-logger"
 )
@@ -58,7 +60,7 @@ type AppStartDelegate func(app *App) error
 // App is the server for the app.
 type App struct {
 	name     string
-	domain   string
+	baseURL  *url.URL
 	bindAddr string
 	port     string
 
@@ -108,14 +110,19 @@ func (a *App) SetName(name string) {
 	}
 }
 
-// Domain returns the domain for the app.
-func (a *App) Domain() string {
-	return a.domain
+// BaseURL returns the domain for the app.
+func (a *App) BaseURL() *url.URL {
+	return a.baseURL
 }
 
-// SetDomain sets the domain for the app.
-func (a *App) SetDomain(domain string) {
-	a.domain = domain
+// SetBaseURL sets the base url for the app.
+func (a *App) SetBaseURL(baseURL string) error {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return exception.Wrap(err)
+	}
+	a.baseURL = u
+	return nil
 }
 
 // ReadTimeout returns the read timeout for the server.
