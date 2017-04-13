@@ -242,7 +242,7 @@ func (mrb *MockRequestBuilder) Ctx(p RouteParameters) (*Ctx, error) {
 		rc = NewCtx(w, r, p)
 	}
 
-	return rc, nil
+	return rc.WithTx(mrb.tx), nil
 }
 
 // Route returns the corresponding route.
