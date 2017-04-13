@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -92,8 +93,7 @@ type App struct {
 	writeTimeout      time.Duration
 	idleTimeout       time.Duration
 
-	//ctxPool *CtxPool
-
+	tx   *sql.Tx
 	auth *AuthManager
 }
 
@@ -424,7 +424,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	if root := a.routes[req.Method]; root != nil {
 		if route, params, tsr := root.getValue(path); route != nil {
-			route.Handler(w, req, route, params)
+			route.Handler(w, req, route, params, nil)
 			return
 		} else if req.Method != "CONNECT" && path != "/" {
 			code := 301 // Permanent redirect, request with GET method
@@ -458,7 +458,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			if allow := a.allowed(path, req.Method); len(allow) > 0 {
 				w.Header().Set("Allow", allow)
 				if a.methodNotAllowedHandler != nil {
-					a.methodNotAllowedHandler(w, req, nil, nil)
+					a.methodNotAllowedHandler(w, req, nil, nil, nil)
 				} else {
 					http.Error(w,
 						http.StatusText(http.StatusMethodNotAllowed),
@@ -472,7 +472,7 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	// Handle 404
 	if a.notFoundHandler != nil {
-		a.notFoundHandler(w, req, nil, nil)
+		a.notFoundHandler(w, req, nil, nil, nil)
 	} else {
 		http.NotFound(w, req)
 	}
@@ -550,7 +550,7 @@ func (a *App) SetPanicHandler(handler PanicAction) {
 		a.renderAction(func(ctx *Ctx) Result {
 			a.logger.ErrorEventWithState(logger.EventFatalError, logger.ColorRed, fmt.Errorf("%v", err), ctx)
 			return handler(ctx, err)
-		})(w, r, nil, nil)
+		})(w, r, nil, nil, nil)
 	}
 }
 
@@ -616,13 +616,13 @@ func (a *App) onResponse(writer logger.Logger, ts logger.TimeSource, eventFlag l
 // renderAction is the translation step from Action to Handler.
 // this is where the bulk of the "pipeline" happens.
 func (a *App) renderAction(action Action) Handler {
-	return func(w http.ResponseWriter, r *http.Request, route *Route, p RouteParameters) {
+	return func(w http.ResponseWriter, r *http.Request, route *Route, p RouteParameters, tx *sql.Tx) {
 		a.setResponseHeaders(w)
 		response := a.newResponse(w, r)
 		context := a.pipelineInit(response, r, route, p)
+		context = context.WithTx(tx)
 		a.renderResult(action, context)
 		a.pipelineComplete(context)
-		//a.ctxPool.Put(context)
 	}
 }
 

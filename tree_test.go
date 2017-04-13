@@ -5,6 +5,7 @@
 package web
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -26,7 +27,7 @@ func printChildren(n *node, prefix string) {
 var fakeHandlerValue string
 
 func fakeHandler(val string) Handler {
-	return func(http.ResponseWriter, *http.Request, *Route, RouteParameters) {
+	return func(http.ResponseWriter, *http.Request, *Route, RouteParameters, *sql.Tx) {
 		fakeHandlerValue = val
 	}
 }
@@ -49,7 +50,7 @@ func checkRequests(t *testing.T, tree *node, requests testRequests) {
 		} else if request.nilHandler {
 			t.Errorf("handle mismatch for route '%s': Expected nil handle", request.path)
 		} else {
-			route.Handler(nil, nil, nil, nil)
+			route.Handler(nil, nil, nil, nil, nil)
 			if fakeHandlerValue != request.route {
 				t.Errorf("handle mismatch for route '%s': Wrong handle (%s != %s)", request.path, fakeHandlerValue, request.route)
 			}

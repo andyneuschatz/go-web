@@ -318,7 +318,7 @@ func (mrb *MockRequestBuilder) Response() (res *http.Response, err error) {
 	}
 
 	w := NewMockResponseWriter(buffer)
-	route.Handler(w, req, route, params)
+	route.Handler(w, req, route, params, mrb.tx)
 	res = &http.Response{
 		Body:          ioutil.NopCloser(bytes.NewBuffer(buffer.Bytes())),
 		ContentLength: int64(w.ContentLength()),
