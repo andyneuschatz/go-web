@@ -198,7 +198,7 @@ func (a *App) UseTLSClientCertPoolFromCerts(certs ...[]byte) error {
 	}
 	a.tlsConfig.BuildNameToCertificate()
 	// This is a solution to enforce the server fetch the new config when a new
-	// request come in. The server would use the old ClientCAs pool if this is
+	// request comes in. The server would use the old ClientCAs pool if this is
 	// not called.
 	a.tlsConfig.GetConfigForClient = func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
 		return a.tlsConfig, nil
