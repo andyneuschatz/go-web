@@ -189,9 +189,7 @@ func (a *App) UseTLSFromEnvironment() error {
 
 // UseTLSClientCertPoolFromCerts set the client cert pool from a given pem.
 func (a *App) UseTLSClientCertPoolFromCerts(certs ...[]byte) error {
-	if a.tlsConfig.ClientCAs == nil {
-		a.tlsConfig.ClientCAs = x509.NewCertPool()
-	}
+	a.tlsConfig.ClientCAs = x509.NewCertPool()
 	for _, cert := range certs {
 		ok := a.tlsConfig.ClientCAs.AppendCertsFromPEM(cert)
 		if !ok {
@@ -199,6 +197,12 @@ func (a *App) UseTLSClientCertPoolFromCerts(certs ...[]byte) error {
 		}
 	}
 	a.tlsConfig.BuildNameToCertificate()
+	// This is a solution to enforce the server fetch the new config when a new
+	// request come in. The server would use the old ClientCAs pool if this is
+	// not called.
+	a.tlsConfig.GetConfigForClient = func(_ *tls.ClientHelloInfo) (*tls.Config, error) {
+		return a.tlsConfig, nil
+	}
 	return nil
 }
 
